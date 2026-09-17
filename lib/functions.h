@@ -3,7 +3,6 @@
 
 namespace TomatoInterpretato {
 
-// write(expr): prints the value on its own line
 class WriteFunction : public Function {
     std::ostream& out_;
     static constexpr size_t arity_ = 1;
@@ -26,7 +25,6 @@ public:
 
 };
 
-// read(x): reads an integer into variable x
 class ReadFunction : public Function {
     std::istream& in_;
     static constexpr size_t arity_ = 1;

@@ -4,21 +4,6 @@
 
 namespace TomatoInterpretato {
 
-// Converts the JSON representation of the AST into AST nodes.
-//
-// Known shapes (from the reference tool):
-//   {"seq": {"left": S, "right": S}}
-//   {"read": "x"}
-//   {"write": E}
-//   {"if": {"cond": E, "then": S, "else": S}}
-//   {"binop": "+", "left": E, "right": E}
-//   {"var": "x"}
-//   {"const": 0}
-//
-// Shapes of assign / while / do-while / for / skip are not confirmed yet,
-// so the builder accepts several natural spellings for them (see ast_builder.cpp).
-//
-// seq nodes are flattened: every statement body becomes std::vector<StmtNode>.
 class AstBuilder {
 public:
     using Json = nlohmann::json;

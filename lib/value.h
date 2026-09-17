@@ -9,7 +9,6 @@ using Value = std::int64_t;
 
 namespace ValueOps {
 
-// Arithmetic wraps around in two's complement instead of signed overflow UB
 inline Value Wrap(std::uint64_t value) {
     return static_cast<Value>(value);
 }
@@ -32,7 +31,6 @@ struct Multiply {
     }
 };
 
-// Truncation toward zero
 struct Divide {
     Value operator()(Value lhs, Value rhs) const {
         if (rhs == 0) throw interpret_error("Division by zero");
@@ -41,7 +39,6 @@ struct Divide {
     }
 };
 
-// Remainder has the sign of the dividend
 struct Mod {
     Value operator()(Value lhs, Value rhs) const {
         if (rhs == 0) throw interpret_error("Division by zero");

@@ -12,7 +12,6 @@ namespace TomatoInterpretato {
 
 
 enum class TokenType {
-    // Ключевые слова
     Read, Write,
     If, Elif, Else,
     While, Do, For,
@@ -21,9 +20,8 @@ enum class TokenType {
     // Общие
     Identifier,
 
-    // Логические
-    And,         // &&
-    Or,          // !!
+    And,
+    Or,
 
     // Арифметические
     Plus,        // +
@@ -34,8 +32,8 @@ enum class TokenType {
 
     // Присваивания
     Assign,          // =
-    OrAssign,        // !!=
-    AndAssign,       // &&=
+    OrAssign,
+    AndAssign,
     PlusAssign,      // +=
     MinusAssign,     // -=
     StarAssign,      // *=
@@ -50,11 +48,11 @@ enum class TokenType {
     LessEqual,       // <=
     GreaterEqual,    // >=
 
-    Semicolon,    // ;
+    Semicolon,
     LParen,       // (
     RParen,       // )
-    LBrace,       // {
-    RBrace,       // }
+    LBrace,
+    RBrace,
 
     // Литералы
     Number,
@@ -168,7 +166,6 @@ public:
 };
 
 
-// Built-in functions (read, write) are implemented in functions.h
 class Function {
 public:
 
@@ -285,7 +282,6 @@ public:
         , else_body_(std::move(else_branch))
     {}
 
-    // Returns true if the then-branch was taken
     bool execute(Environment& env) override {
         Value condition = condition_->evaluate(env);
 
@@ -365,7 +361,6 @@ private:
 };
 
 
-// for (init cond; step) body
 class ForStmt : public BaseStmt {
 public:
     ForStmt(std::vector<StmtNode>&& init, ExprNode&& condition, std::vector<StmtNode>&& step, std::vector<StmtNode>&& body)

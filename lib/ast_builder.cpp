@@ -11,7 +11,6 @@ namespace {
 using Json = nlohmann::json;
 using Aliases = std::initializer_list<const char*>;
 
-// Tags for each node kind. The first spelling is the one we believe the reference uses.
 const Aliases kSeqTags      = {"seq", "block", "stmts", "sequence"};
 const Aliases kSkipTags     = {"skip"};
 const Aliases kReadTags     = {"read"};
@@ -26,7 +25,6 @@ const Aliases kConstTags    = {"const", "num", "number", "int"};
 const Aliases kVarTags      = {"var", "ident", "id", "variable"};
 const Aliases kBinOpTags    = {"binop", "op"};
 
-// Field names inside nodes
 const Aliases kLeftFields   = {"left", "lhs", "l", "first"};
 const Aliases kRightFields  = {"right", "rhs", "r", "second"};
 const Aliases kCondFields   = {"cond", "condition", "test", "expr"};
@@ -39,21 +37,18 @@ const Aliases kNameFields   = {"var", "name", "ident", "id", "lhs", "left", "tar
 const Aliases kValueFields  = {"value", "expr", "rhs", "right", "val", "e"};
 const Aliases kOpFields     = {"op", "binop", "operator"};
 
-// Short description of a node for error messages
 std::string describe(const Json& json) {
     std::string text = json.dump();
     if (text.size() > 80) text = text.substr(0, 77) + "...";
     return text;
 }
 
-// nullptr if `json` is not an object or the key is absent
 const Json* find_key(const Json& json, const char* key) {
     if (!json.is_object()) return nullptr;
     auto it = json.find(key);
     return it == json.end() ? nullptr : &*it;
 }
 
-// Returns the tag key present in `json` and its payload, or nullptr
 const Json* find_tag(const Json& json, Aliases tags, std::string* tag = nullptr) {
     for (const char* name : tags) {
         if (const Json* payload = find_key(json, name)) {
@@ -64,8 +59,6 @@ const Json* find_tag(const Json& json, Aliases tags, std::string* tag = nullptr)
     return nullptr;
 }
 
-// Looks a field up in the node payload first, then in the node itself (flat form,
-// like {"binop": "+", "left": ..., "right": ...}). `tag` is never returned as a field.
 const Json* find_field(const Json& node, const Json& payload, const std::string& tag, Aliases fields) {
     for (const char* name : fields) {
         if (const Json* field = find_key(payload, name)) return field;
@@ -98,7 +91,6 @@ Value parse_integer(const Json& json) {
     throw ast_error("Bad integer constant " + describe(json));
 }
 
-// Variable name may be given as "x" or as {"var": "x"}
 std::string parse_name(const Json& json) {
     if (json.is_string()) return json.get<std::string>();
     if (const Json* inner = find_tag(json, kVarTags); inner && inner->is_string()) {
@@ -131,7 +123,7 @@ TokenType parse_op(const Json& json) {
     throw ast_error("Unknown binary operator " + describe(json));
 }
 
-}  // namespace
+}
 
 
 void AstBuilder::build(const Json& json, AST& ast) const {
@@ -147,7 +139,6 @@ std::vector<StmtNode> AstBuilder::build_body(const Json& json) const {
     return body;
 }
 
-// Flattens seq nodes and arrays into a list of statements
 void AstBuilder::build_body(const Json& json, std::vector<StmtNode>& body) const {
     std::string tag;
 
@@ -200,17 +191,14 @@ StmtNode AstBuilder::build_stmt(const Json& json) const {
     }
 
     if (const Json* p = find_tag(json, kWriteTags, &tag)) {
-        // {"write": E} or {"write": {"expr": E}}
         const Json* expr = find_key(*p, "expr");
         return StmtNode(new ExprStmt(call_builtin("write", build_expr(expr ? *expr : *p))));
     }
 
     if (const Json* p = find_tag(json, kAssignTags, &tag)) {
-        // {"assign": {"var": "x", "value": E}}  or  {"assign": "x", "value": E}
         std::string name = p->is_string() ? p->get<std::string>() : parse_name(require_field(json, *p, tag, kNameFields));
         ExprNode rhs = build_expr(require_field(json, *p, tag, kValueFields));
 
-        // IDENT BINOP "=" expr  ->  IDENT = IDENT BINOP expr
         if (const Json* op = find_field(json, *p, tag, kOpFields)) {
             ExprNode var(new VariableExpr(name, pos));
             rhs = ExprNode(new BinaryOpExpr(parse_op(*op), std::move(var), std::move(rhs), pos));
@@ -274,7 +262,6 @@ ExprNode AstBuilder::build_expr(const Json& json) const {
     }
 
     if (const Json* p = find_tag(json, kBinOpTags, &tag)) {
-        // {"binop": "+", "left": E, "right": E}  or  {"binop": {"op": "+", "left": E, "right": E}}
         const Json& op = p->is_object() ? require_field(json, *p, tag, kOpFields) : *p;
         TokenType bin_op = parse_op(op);
         ExprNode lhs = build_expr(require_field(json, *p, tag, kLeftFields));

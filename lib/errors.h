@@ -87,7 +87,6 @@ public:
 
 };
 
-// JSON that does not describe a valid AST
 class ast_error : public basic_error {
 public:
 

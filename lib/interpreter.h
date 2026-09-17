@@ -23,8 +23,6 @@ public:
 
     }
 
-    // Reads one JSON AST from `istream` and executes it.
-    // `istream` may be the program input itself: everything after the JSON value is left for `read`.
     bool interpret(std::istream& istream) {
         
         if (!istream) {
