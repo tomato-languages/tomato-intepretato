@@ -1,5 +1,6 @@
 #include "common/utils.h"
 #include "ast/ast_builders/json_builder/ast_builder.h"
+#include "ast/ast_builders/script_builder/ast_builder.h"
 #include "common/errors.h"
 
 #include <memory>
@@ -25,7 +26,7 @@ std::shared_ptr<NAst::IAstBuilder> CreateAstBuilder(const BuilderSettings& setti
         case EBuilderMode::JSON:
             return std::make_shared<NAst::JsonAstBuilder>(CreateJsonData(istream));
         case EBuilderMode::SCRIPT:
-            return nullptr;
+            return std::make_shared<NAst::ScriptAstBuilder>(istream);
         default:
             break;
     }
