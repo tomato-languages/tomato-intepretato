@@ -1,10 +1,11 @@
-#include "ast_builder.h"
+#include "ast/ast_builders/json_builder/ast_builder.h"
 #include <charconv>
 #include <initializer_list>
 #include <limits>
 #include <unordered_map>
 
-namespace TomatoInterpretato {
+namespace NTomatoInterpretato {
+namespace NAst {
 
 namespace {
 
@@ -125,21 +126,29 @@ TokenType parse_op(const Json& json) {
 
 }
 
+JsonAstBuilder& JsonAstBuilder::withJson(const Json& json) {
+    json_ = json;
+    return *this;
+}
 
-void AstBuilder::build(const Json& json, AST& ast) const {
-    const Json* program = find_key(json, "program");
-    for (auto& stmt : build_body(program ? *program : json)) {
+void JsonAstBuilder::withBuiltin(const Builtins& builtins) {
+    builtins_ = builtins;
+}
+
+void JsonAstBuilder::build(AST& ast) {
+    const Json* program = find_key(json_, "program");
+    for (auto& stmt : build_body(program ? *program : json_)) {
         ast.push_back(std::move(stmt));
     }
 }
 
-std::vector<StmtNode> AstBuilder::build_body(const Json& json) const {
+std::vector<StmtNode> JsonAstBuilder::build_body(const Json& json) const {
     std::vector<StmtNode> body;
     build_body(json, body);
     return body;
 }
 
-void AstBuilder::build_body(const Json& json, std::vector<StmtNode>& body) const {
+void JsonAstBuilder::build_body(const Json& json, std::vector<StmtNode>& body) const {
     std::string tag;
 
     if (json.is_array()) {
@@ -162,13 +171,13 @@ void AstBuilder::build_body(const Json& json, std::vector<StmtNode>& body) const
     body.push_back(build_stmt(json));
 }
 
-ExprNode AstBuilder::call_builtin(const std::string& name, ExprNode&& arg) const {
+ExprNode JsonAstBuilder::call_builtin(const std::string& name, ExprNode&& arg) const {
     std::vector<ExprNode> args;
     args.push_back(std::move(arg));
     return ExprNode(new CallableExpr(builtins_.at(name), std::move(args)));
 }
 
-StmtNode AstBuilder::build_stmt(const Json& json) const {
+StmtNode JsonAstBuilder::build_stmt(const Json& json) const {
     Pos pos;
     std::string tag;
 
@@ -241,7 +250,7 @@ StmtNode AstBuilder::build_stmt(const Json& json) const {
     throw ast_error("Unknown statement node " + describe(json));
 }
 
-ExprNode AstBuilder::build_expr(const Json& json) const {
+ExprNode JsonAstBuilder::build_expr(const Json& json) const {
     Pos pos;
     std::string tag;
 
@@ -272,4 +281,5 @@ ExprNode AstBuilder::build_expr(const Json& json) const {
     throw ast_error("Unknown expression node " + describe(json));
 }
 
-};
+}
+}

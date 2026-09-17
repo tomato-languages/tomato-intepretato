@@ -1,7 +1,13 @@
 #pragma once
-#include "ast.h"
+#include "ast/ast.h"
+#include "common/errors.h"
 
-namespace TomatoInterpretato {
+namespace NTomatoInterpretato {
+
+using NAst::Function;
+using NAst::ExprNode;
+using NAst::Environment;
+using NAst::VariableExpr;
 
 class WriteFunction : public Function {
     std::ostream& out_;
@@ -54,4 +60,4 @@ public:
 
 };
 
-};
+}

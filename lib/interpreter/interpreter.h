@@ -1,19 +1,24 @@
 #pragma once
 #include <iostream>
-#include <nlohmann/json.hpp>
-#include "ast.h"
-#include "ast_builder.h"
-#include "functions.h"
+#include <memory>
+#include "ast/ast.h"
+#include "ast/ast_builders/ast_builder.h"
+#include "interpreter/functions.h"
+#include "common/errors.h"
+
 bool interpret(std::istream& ast_input, std::istream& input, std::ostream& output);
 
-namespace TomatoInterpretato {
-    
+namespace NTomatoInterpretato {
+
+using NAst::AST;
+using NAst::Environment;
+using NAst::Builtins;
+
 class Interpreter {
 public:
 
     Interpreter(std::istream& input = std::cin, std::ostream& output = std::cout) 
         : output_(output)
-        , ast_()
         , env_()
         , builtins_()
     {
@@ -23,21 +28,19 @@ public:
 
     }
 
-    bool interpret(std::istream& istream) {
-        
-        if (!istream) {
-            throw interpret_error("Input stream is not valid");
+    bool interpret(const std::shared_ptr<NAst::IAstBuilder>& builder) {
+        if (!builder) [[unlikely]] {
+            return false;
         }
 
-        nlohmann::json json;
-        istream >> json;
+        builder->withBuiltin(builtins_);
 
-        AstBuilder builder(builtins_);
-        builder.build(json, ast_);
+        AST ast;
+        builder->build(ast);
 
-        while (!ast_.empty()) {
-            ast_.front()->execute(env_);
-            ast_.pop_front();
+        while (!ast.empty()) {
+            ast.front()->execute(env_);
+            ast.pop_front();
         }
 
         output_.flush();
@@ -51,10 +54,9 @@ private:
 
     std::ostream& output_;
 
-    AST ast_;
     Environment env_;
     Builtins builtins_;
 
 };
 
-};
+}

@@ -1,21 +1,24 @@
 #pragma once
 #include <nlohmann/json.hpp>
-#include "ast.h"
+#include "ast/ast_builders/ast_builder.h"
 
-namespace TomatoInterpretato {
+namespace NTomatoInterpretato {
+namespace NAst {
 
-class AstBuilder {
+class JsonAstBuilder : public IAstBuilder {
 public:
     using Json = nlohmann::json;
 
-    AstBuilder(const Builtins& builtins)
-        : builtins_(builtins)
-    {}
+    JsonAstBuilder() {}
+    JsonAstBuilder(const Json& json) : json_(json) {}
 
-    void build(const Json& json, AST& ast) const;
+    JsonAstBuilder& withJson(const Json& json);
+    void withBuiltin(const Builtins& builtins) override;
+    void build(AST& ast) override;
 
 private:
-    const Builtins& builtins_;
+    Builtins builtins_;
+    Json json_;
 
     std::vector<StmtNode> build_body(const Json& json) const;
     void build_body(const Json& json, std::vector<StmtNode>& body) const;
@@ -25,4 +28,5 @@ private:
     ExprNode call_builtin(const std::string& name, ExprNode&& arg) const;
 };
 
-};
+}
+}

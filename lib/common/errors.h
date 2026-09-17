@@ -2,7 +2,7 @@
 #include <exception>
 #include <string>
 
-namespace TomatoInterpretato {
+namespace NTomatoInterpretato {
 
 struct Pos {
     int line;
@@ -100,4 +100,4 @@ public:
 
 };
 
-};
+}
