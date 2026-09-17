@@ -1,9 +1,9 @@
 #include <iostream>
 #include <fstream>
-#include <interpreter.h>
-#include <argparser.h>
+#include "interpreter/interpreter.h"
+#include "argparser.h"
 
-using namespace TomatoInterpretato;
+using namespace NTomatoInterpretato;
 
 int main(int argc, char** argv) {
 

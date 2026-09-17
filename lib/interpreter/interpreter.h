@@ -1,13 +1,19 @@
 #pragma once
 #include <iostream>
 #include <nlohmann/json.hpp>
-#include "ast.h"
-#include "ast_builder.h"
-#include "functions.h"
+#include "ast/ast.h"
+#include "ast/ast_builders/json_builder/ast_builder.h"
+#include "interpreter/functions.h"
+
 bool interpret(std::istream& ast_input, std::istream& input, std::ostream& output);
 
-namespace TomatoInterpretato {
-    
+namespace NTomatoInterpretato {
+
+using NAst::AST;
+using NAst::Environment;
+using NAst::Builtins;
+using NAst::JsonAstBuilder;
+
 class Interpreter {
 public:
 
@@ -32,8 +38,8 @@ public:
         nlohmann::json json;
         istream >> json;
 
-        AstBuilder builder(builtins_);
-        builder.build(json, ast_);
+        auto builder = JsonAstBuilder(builtins_).withJson(json);
+        builder.build(ast_);
 
         while (!ast_.empty()) {
             ast_.front()->execute(env_);
@@ -57,4 +63,4 @@ private:
 
 };
 
-};
+}

@@ -1,9 +1,9 @@
 #pragma once
 #include <cstdint>
 #include <limits>
-#include "errors.h"
+#include "common/errors.h"
 
-namespace TomatoInterpretato {
+namespace NTomatoInterpretato {
 
 using Value = std::int64_t;
 
@@ -79,6 +79,6 @@ struct Or {
     Value operator()(Value lhs, Value rhs) const { return (lhs != 0 || rhs != 0) ? 1 : 0; }
 };
 
-};
+}
 
-};
+}

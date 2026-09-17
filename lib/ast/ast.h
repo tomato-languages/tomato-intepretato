@@ -5,11 +5,11 @@
 #include <vector>
 #include <deque>
 #include <unordered_map>
-#include "value.h"
-#include "errors.h"
+#include "ast/common/value.h"
+#include "common/errors.h"
 
-namespace TomatoInterpretato {
-
+namespace NTomatoInterpretato {
+namespace NAst {
 
 enum class TokenType {
     Read, Write,
@@ -429,4 +429,5 @@ private:
 
 };
 
-};
+}
+}

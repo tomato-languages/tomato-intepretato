@@ -1,0 +1,3 @@
+add_library(script_builder INTERFACE)
+
+target_link_libraries(script_builder INTERFACE ast_builder)
