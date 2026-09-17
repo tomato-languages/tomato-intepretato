@@ -29,13 +29,12 @@ public:
         update_what();
     }
 
-    const char* what() const noexcept override {
-        return msg_.c_str();
-    }
+    virtual const char* what() const noexcept override = 0;
 
 protected:
     std::string msg_;
     Pos pos_;
+    // debug info in future
 
     void update_what() {
         if (pos_) {
@@ -43,22 +42,63 @@ protected:
         }
     }
 
+   
+
 };
 
-// JSON that is not a valid AST
+class parsing_error : public basic_error {
+public:
+
+    parsing_error(std::string&& msg, Pos position) 
+        : basic_error(std::move(msg), position)
+    {}
+
+    const char* what() const noexcept override {
+        return msg_.c_str();
+    }
+
+
+};
+
+class lexer_error : public basic_error {
+public:
+
+    lexer_error(std::string&& msg, Pos position) 
+        : basic_error(std::move(msg), position)
+    {}
+
+    const char* what() const noexcept override {
+        return msg_.c_str();
+    }
+
+
+};
+
+class interpret_error : public basic_error {
+public:
+
+    interpret_error(std::string&& msg, Pos position = Pos()) 
+        : basic_error(std::move(msg), position)
+    {}
+
+    const char* what() const noexcept override {
+        return msg_.c_str();
+    }
+
+};
+
+// JSON that does not describe a valid AST
 class ast_error : public basic_error {
 public:
+
     ast_error(std::string&& msg, Pos position = Pos())
         : basic_error(std::move(msg), position)
     {}
-};
 
-// Runtime error during program execution
-class interpret_error : public basic_error {
-public:
-    interpret_error(std::string&& msg, Pos position = Pos())
-        : basic_error(std::move(msg), position)
-    {}
+    const char* what() const noexcept override {
+        return msg_.c_str();
+    }
+
 };
 
 };
