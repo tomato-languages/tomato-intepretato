@@ -9,15 +9,15 @@ class JsonAstBuilder : public IAstBuilder {
 public:
     using Json = nlohmann::json;
 
-    JsonAstBuilder(const Builtins& builtins)
-        : builtins_(builtins)
-    {}
+    JsonAstBuilder() {}
+    JsonAstBuilder(const Json& json) : json_(json) {}
 
     JsonAstBuilder& withJson(const Json& json);
+    void withBuiltin(const Builtins& builtins) override;
     void build(AST& ast) override;
 
 private:
-    const Builtins& builtins_;
+    Builtins builtins_;
     Json json_;
 
     std::vector<StmtNode> build_body(const Json& json) const;

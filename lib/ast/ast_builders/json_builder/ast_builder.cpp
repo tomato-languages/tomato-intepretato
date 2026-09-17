@@ -131,6 +131,10 @@ JsonAstBuilder& JsonAstBuilder::withJson(const Json& json) {
     return *this;
 }
 
+void JsonAstBuilder::withBuiltin(const Builtins& builtins) {
+    builtins_ = builtins;
+}
+
 void JsonAstBuilder::build(AST& ast) {
     const Json* program = find_key(json_, "program");
     for (auto& stmt : build_body(program ? *program : json_)) {
