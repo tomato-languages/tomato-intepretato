@@ -1,6 +1,6 @@
 #pragma once
 #include "ast.h"
-#include "json.h"
+#include <nlohmann/json.hpp>
 
 namespace TomatoInterpretato {
 
@@ -19,6 +19,8 @@ namespace TomatoInterpretato {
 // so the builder accepts several natural spellings for them (see ast_builder.cpp).
 class AstBuilder {
 public:
+    using Json = nlohmann::json;
+
     StmtNode build_program(const Json& json) const;
     StmtNode build_stmt(const Json& json) const;
     ExprNode build_expr(const Json& json) const;

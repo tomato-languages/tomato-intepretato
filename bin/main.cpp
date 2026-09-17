@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
             }
             interpretator.interpret(fstream);
         }
-    } catch (const json_error& e) {
+    } catch (const nlohmann::json::exception& e) {
         std::cout.flush();
         std::cerr << "JSON error: " << e.what() << std::endl;
         return 1;

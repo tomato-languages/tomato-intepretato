@@ -1,11 +1,13 @@
 #include "ast_builder.h"
 #include <charconv>
 #include <initializer_list>
+#include <limits>
 
 namespace TomatoInterpretato {
 
 namespace {
 
+using Json = nlohmann::json;
 using Aliases = std::initializer_list<const char*>;
 
 // Tags for each node kind. The first spelling is the one we believe the reference uses.
@@ -36,23 +38,24 @@ const Aliases kNameFields   = {"var", "name", "ident", "id", "lhs", "left", "tar
 const Aliases kValueFields  = {"value", "expr", "rhs", "right", "val", "e"};
 const Aliases kOpFields     = {"op", "binop", "operator"};
 
-std::string keys_of(const Json& json) {
-    if (!json.is_object()) return json.type_name();
+// Short description of a node for error messages
+std::string describe(const Json& json) {
+    std::string text = json.dump();
+    if (text.size() > 80) text = text.substr(0, 77) + "...";
+    return text;
+}
 
-    std::string result = "{";
-    bool first = true;
-    for (const auto& [key, _] : json.as_object()) {
-        if (!first) result += ", ";
-        result += "\"" + key + "\"";
-        first = false;
-    }
-    return result + "}";
+// nullptr if `json` is not an object or the key is absent
+const Json* find_key(const Json& json, const char* key) {
+    if (!json.is_object()) return nullptr;
+    auto it = json.find(key);
+    return it == json.end() ? nullptr : &*it;
 }
 
 // Returns the tag key present in `json` and its payload, or nullptr
 const Json* find_tag(const Json& json, Aliases tags, std::string* tag = nullptr) {
     for (const char* name : tags) {
-        if (const Json* payload = json.find(name)) {
+        if (const Json* payload = find_key(json, name)) {
             if (tag) *tag = name;
             return payload;
         }
@@ -64,82 +67,79 @@ const Json* find_tag(const Json& json, Aliases tags, std::string* tag = nullptr)
 // like {"binop": "+", "left": ..., "right": ...}). `tag` is never returned as a field.
 const Json* find_field(const Json& node, const Json& payload, const std::string& tag, Aliases fields) {
     for (const char* name : fields) {
-        if (const Json* field = payload.find(name)) return field;
+        if (const Json* field = find_key(payload, name)) return field;
     }
     for (const char* name : fields) {
         if (name == tag) continue;
-        if (const Json* field = node.find(name)) return field;
+        if (const Json* field = find_key(node, name)) return field;
     }
     return nullptr;
 }
 
 const Json& require_field(const Json& node, const Json& payload, const std::string& tag, Aliases fields) {
     if (const Json* field = find_field(node, payload, tag, fields)) return *field;
-    throw ast_error("Node \"" + tag + "\" misses field \"" + *fields.begin() + "\": " + keys_of(node), node.position);
+    throw ast_error("Node \"" + tag + "\" misses field \"" + *fields.begin() + "\": " + describe(node));
 }
 
 Value parse_integer(const Json& json) {
-    std::string text;
-    if (json.is_number()) {
-        text = json.as_number().text;
-    } else if (json.is_string()) {
-        text = json.as_string();
-    } else {
-        throw ast_error("Expected integer constant, got " + json.type_name(), json.position);
+    if (json.is_number_integer() && !json.is_number_unsigned()) {
+        return json.get<Value>();
     }
-
-    Value value = 0;
-    auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
-    if (ec != std::errc() || end != text.data() + text.size()) {
-        throw ast_error("Bad integer constant '" + text + "'", json.position);
+    if (json.is_number_unsigned() && json.get<std::uint64_t>() <= std::numeric_limits<Value>::max()) {
+        return json.get<Value>();
     }
-    return value;
+    if (json.is_string()) {
+        const auto& text = json.get_ref<const std::string&>();
+        Value value = 0;
+        auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+        if (ec == std::errc() && end == text.data() + text.size()) return value;
+    }
+    throw ast_error("Bad integer constant " + describe(json));
 }
 
 // Variable name may be given as "x" or as {"var": "x"}
 std::string parse_name(const Json& json) {
-    if (json.is_string()) return json.as_string();
-    if (const Json* inner = find_tag(json, kVarTags)) {
-        if (inner->is_string()) return inner->as_string();
+    if (json.is_string()) return json.get<std::string>();
+    if (const Json* inner = find_tag(json, kVarTags); inner && inner->is_string()) {
+        return inner->get<std::string>();
     }
-    throw ast_error("Expected variable name, got " + keys_of(json), json.position);
+    throw ast_error("Expected variable name, got " + describe(json));
 }
 
 BinOp parse_op(const Json& json) {
     BinOp op;
-    if (json.is_string() && parse_binop(json.as_string(), op)) return op;
-    std::string shown = json.is_string() ? "'" + json.as_string() + "'" : json.type_name();
-    throw ast_error("Unknown binary operator " + shown, json.position);
+    if (json.is_string() && parse_binop(json.get<std::string>(), op)) return op;
+    throw ast_error("Unknown binary operator " + describe(json));
 }
 
 }  // namespace
 
 
 StmtNode AstBuilder::build_program(const Json& json) const {
-    if (const Json* program = json.find("program")) {
+    if (const Json* program = find_key(json, "program")) {
         return build_stmt(*program);
     }
     return build_stmt(json);
 }
 
 StmtNode AstBuilder::build_stmt(const Json& json) const {
-    Pos pos = json.position;
+    Pos pos;
     std::string tag;
 
     if (json.is_array()) {
         std::vector<StmtNode> body;
-        for (const auto& item : json.as_array()) {
+        for (const auto& item : json) {
             body.push_back(build_stmt(item));
         }
         return std::make_unique<SeqStmt>(std::move(body), pos);
     }
 
-    if (json.is_string() && json.as_string() == "skip") {
+    if (json.is_string() && json.get<std::string>() == "skip") {
         return std::make_unique<SkipStmt>(pos);
     }
 
     if (!json.is_object()) {
-        throw ast_error("Expected statement, got " + json.type_name(), pos);
+        throw ast_error("Expected statement, got " + describe(json));
     }
 
     if (const Json* p = find_tag(json, kSeqTags, &tag)) {
@@ -162,13 +162,13 @@ StmtNode AstBuilder::build_stmt(const Json& json) const {
 
     if (const Json* p = find_tag(json, kWriteTags, &tag)) {
         // {"write": E} or {"write": {"expr": E}}
-        const Json* expr = p->is_object() ? p->find("expr") : nullptr;
+        const Json* expr = find_key(*p, "expr");
         return std::make_unique<WriteStmt>(build_expr(expr ? *expr : *p), pos);
     }
 
     if (const Json* p = find_tag(json, kAssignTags, &tag)) {
         // {"assign": {"var": "x", "value": E}}  or  {"assign": "x", "value": E}
-        std::string name = p->is_string() ? p->as_string() : parse_name(require_field(json, *p, tag, kNameFields));
+        std::string name = p->is_string() ? p->get<std::string>() : parse_name(require_field(json, *p, tag, kNameFields));
         ExprNode value = build_expr(require_field(json, *p, tag, kValueFields));
 
         // IDENT BINOP "=" expr, if the reference does not desugar it itself
@@ -209,11 +209,11 @@ StmtNode AstBuilder::build_stmt(const Json& json) const {
         return std::make_unique<ForStmt>(std::move(init), std::move(cond), std::move(step), std::move(body), pos);
     }
 
-    throw ast_error("Unknown statement node " + keys_of(json), pos);
+    throw ast_error("Unknown statement node " + describe(json));
 }
 
 ExprNode AstBuilder::build_expr(const Json& json) const {
-    Pos pos = json.position;
+    Pos pos;
     std::string tag;
 
     if (json.is_number()) {
@@ -221,7 +221,7 @@ ExprNode AstBuilder::build_expr(const Json& json) const {
     }
 
     if (!json.is_object()) {
-        throw ast_error("Expected expression, got " + json.type_name(), pos);
+        throw ast_error("Expected expression, got " + describe(json));
     }
 
     if (const Json* p = find_tag(json, kConstTags, &tag)) {
@@ -241,7 +241,7 @@ ExprNode AstBuilder::build_expr(const Json& json) const {
         return std::make_unique<BinOpExpr>(binop, std::move(lhs), std::move(rhs), pos);
     }
 
-    throw ast_error("Unknown expression node " + keys_of(json), pos);
+    throw ast_error("Unknown expression node " + describe(json));
 }
 
 };

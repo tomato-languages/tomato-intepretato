@@ -45,15 +45,7 @@ protected:
 
 };
 
-// Malformed JSON text
-class json_error : public basic_error {
-public:
-    json_error(std::string&& msg, Pos position)
-        : basic_error(std::move(msg), position)
-    {}
-};
-
-// Well-formed JSON that is not a valid AST
+// JSON that is not a valid AST
 class ast_error : public basic_error {
 public:
     ast_error(std::string&& msg, Pos position = Pos())
