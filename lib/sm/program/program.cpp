@@ -14,9 +14,8 @@ std::string to_string(const Instruction& instruction) {
         case EOpcode::Binop:       return "BINOP " + instruction.op;
         case EOpcode::Label:       return "LABEL " + instruction.name;
         case EOpcode::Jmp:         return "JMP " + instruction.name;
-        case EOpcode::CJmpZero:    return "CJMP z, " + instruction.name;
-        case EOpcode::CJmpNotZero: return "CJMP nz, " + instruction.name;
-        case EOpcode::End:         return "END";
+        case EOpcode::Jz:          return "JZ " + instruction.name;
+        case EOpcode::Jnz:         return "JNZ " + instruction.name;
     }
 
     throw interpret_error("Unknown stack machine instruction", instruction.position);
@@ -46,27 +45,23 @@ Program Program::read(std::istream& input) {
         if (opcode == "CONST") {
             instruction.opcode = EOpcode::Const;
             valid = static_cast<bool>(source >> instruction.value);
-        } else if (opcode == "LD" || opcode == "ST" || opcode == "LABEL" || opcode == "JMP") {
+        } else if (opcode == "LD" || opcode == "ST" || opcode == "LABEL" || opcode == "JMP" ||
+                   opcode == "JZ" || opcode == "JNZ") {
             if (opcode == "LD") instruction.opcode = EOpcode::Ld;
             if (opcode == "ST") instruction.opcode = EOpcode::St;
             if (opcode == "LABEL") instruction.opcode = EOpcode::Label;
             if (opcode == "JMP") instruction.opcode = EOpcode::Jmp;
+            if (opcode == "JZ") instruction.opcode = EOpcode::Jz;
+            if (opcode == "JNZ") instruction.opcode = EOpcode::Jnz;
             valid = static_cast<bool>(source >> instruction.name);
         } else if (opcode == "BINOP") {
             instruction.opcode = EOpcode::Binop;
             valid = static_cast<bool>(source >> instruction.op);
             valid = valid && ValueOps::IsOperator(instruction.op);
-        } else if (opcode == "CJMP") {
-            std::string condition;
-            valid = static_cast<bool>(source >> condition >> instruction.name);
-            valid = valid && (condition == "z," || condition == "nz,");
-            instruction.opcode = condition == "z," ? EOpcode::CJmpZero : EOpcode::CJmpNotZero;
         } else if (opcode == "READ") {
             instruction.opcode = EOpcode::Read;
         } else if (opcode == "WRITE") {
             instruction.opcode = EOpcode::Write;
-        } else if (opcode == "END") {
-            instruction.opcode = EOpcode::End;
         } else {
             valid = false;
         }

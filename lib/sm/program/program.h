@@ -18,13 +18,12 @@ enum class EOpcode {
     Binop,
     Label,
     Jmp,
-    CJmpZero,
-    CJmpNotZero,
-    End
+    Jz,
+    Jnz
 };
 
 struct Instruction {
-    EOpcode opcode = EOpcode::End;
+    EOpcode opcode = EOpcode::Const;
 
     Value value = 0;
     std::string name;
@@ -75,15 +74,11 @@ public:
     }
 
     void emit_jump_if_zero(const std::string& label, Pos position = Pos()) {
-        emit(Instruction{.opcode = EOpcode::CJmpZero, .name = label, .position = position});
+        emit(Instruction{.opcode = EOpcode::Jz, .name = label, .position = position});
     }
 
     void emit_jump_if_not_zero(const std::string& label, Pos position = Pos()) {
-        emit(Instruction{.opcode = EOpcode::CJmpNotZero, .name = label, .position = position});
-    }
-
-    void emit_end() {
-        emit(Instruction{.opcode = EOpcode::End});
+        emit(Instruction{.opcode = EOpcode::Jnz, .name = label, .position = position});
     }
 
     std::string new_label() {

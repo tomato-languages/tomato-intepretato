@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <memory>
 #include <iostream>
 #include <string>
@@ -6,6 +7,7 @@
 #include <unordered_map>
 #include "ast/common/value.h"
 #include "common/errors.h"
+#include "common/limits.h"
 #include "sm/program/program.h"
 
 namespace NTomatoInterpretato {
@@ -17,6 +19,7 @@ class BaseExpr {
 public:
 
     Pos position;
+    int height = 1;
 
     virtual Value evaluate(Environment& env) const = 0;
 
@@ -99,7 +102,10 @@ public:
         , op(op)
         , lhs(std::move(lhs))
         , rhs(std::move(rhs))
-    {}
+    {
+        height = 1 + std::max(this->lhs->height, this->rhs->height);
+        if (height > kMaxNestingDepth) throw ast_error("Expression is nested too deeply", position);
+    }
 
     Value evaluate(Environment& env) const override {
         Value left = lhs->evaluate(env);

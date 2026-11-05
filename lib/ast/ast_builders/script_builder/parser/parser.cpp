@@ -23,16 +23,30 @@ bool keyword(const std::string& text) {
     return words.contains(text);
 }
 
+class DepthGuard {
+public:
+    DepthGuard(int& depth, Pos position) : depth_(depth) {
+        if (depth_ >= kMaxNestingDepth) throw ast_error("Program is nested too deeply", position);
+        ++depth_;
+    }
+    ~DepthGuard() { --depth_; }
+    DepthGuard(const DepthGuard&) = delete;
+    DepthGuard& operator=(const DepthGuard&) = delete;
+
+private:
+    int& depth_;
+};
+
 }
 
-bool Parser::accept(const std::string& text) {
+bool Parser::accept(std::string_view text) {
     if (token_.kind == Token::Kind::End || token_.text != text) return false;
     token_ = lexer_.next();
     return true;
 }
 
-void Parser::expect(const std::string& text) {
-    if (!accept(text)) throw ast_error("Expected '" + text + "', got '" + token_.text + "'", token_.position);
+void Parser::expect(std::string_view text) {
+    if (!accept(text)) throw ast_error("Expected '" + std::string(text) + "', got '" + token_.text + "'", token_.position);
 }
 
 std::string Parser::identifier() {
@@ -52,13 +66,15 @@ AST Parser::parse() {
 }
 
 AST Parser::body() {
+    DepthGuard guard(depth_, token_.position);
     AST ast;
     if (accept("{")) {
-        while (!accept("}")) {
+        if (token_.text == "}") throw ast_error("Block must contain a statement", token_.position);
+        do {
             if (token_.kind == Token::Kind::End) throw ast_error("Expected '}'", token_.position);
             auto part = body();
             for (auto& stmt : part) ast.push_back(std::move(stmt));
-        }
+        } while (!accept("}"));
     } else {
         ast.push_back(statement());
     }
@@ -66,6 +82,7 @@ AST Parser::body() {
 }
 
 StmtNode Parser::branch() {
+    DepthGuard guard(depth_, token_.position);
     expect("(");
     auto condition = expression();
     expect(")");
@@ -139,6 +156,7 @@ StmtNode Parser::statement() {
 }
 
 ExprNode Parser::expression(int minimum) {
+    DepthGuard guard(depth_, token_.position);
     auto left = primary();
     while (precedence(token_.text) >= minimum) {
         auto op = token_;

@@ -39,8 +39,8 @@ bool StackMachine::run(const Program& program) {
     const auto labels = collect_labels(program);
     const auto& instructions = program.instructions();
     for (const auto& instruction : instructions) {
-        if ((instruction.opcode == EOpcode::Jmp || instruction.opcode == EOpcode::CJmpZero ||
-             instruction.opcode == EOpcode::CJmpNotZero) && !labels.contains(instruction.name)) {
+        if ((instruction.opcode == EOpcode::Jmp || instruction.opcode == EOpcode::Jz ||
+             instruction.opcode == EOpcode::Jnz) && !labels.contains(instruction.name)) {
             throw interpret_error("Unknown label '" + instruction.name + "'", instruction.position);
         }
     }
@@ -103,14 +103,14 @@ bool StackMachine::run(const Program& program) {
                 ip = jump_to(instruction);
                 continue;
 
-            case EOpcode::CJmpZero:
+            case EOpcode::Jz:
                 if (pop(instruction) == 0) {
                     ip = jump_to(instruction);
                     continue;
                 }
                 break;
 
-            case EOpcode::CJmpNotZero:
+            case EOpcode::Jnz:
                 if (pop(instruction) != 0) {
                     ip = jump_to(instruction);
                     continue;
@@ -119,10 +119,6 @@ bool StackMachine::run(const Program& program) {
 
             default:
                 throw interpret_error("Unknown stack machine opcode", instruction.position);
-
-            case EOpcode::End:
-                output_.flush();
-                return true;
         }
 
         ++ip;

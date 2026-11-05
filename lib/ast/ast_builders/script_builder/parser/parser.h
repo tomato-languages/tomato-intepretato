@@ -1,4 +1,5 @@
 #pragma once
+#include <string_view>
 #include "ast/ast.h"
 #include "ast/ast_builders/script_builder/lexer/lexer.h"
 
@@ -15,9 +16,10 @@ private:
     std::istream& input_;
     std::ostream& output_;
     Token token_;
+    int depth_ = 0;
 
-    bool accept(const std::string& text);
-    void expect(const std::string& text);
+    bool accept(std::string_view text);
+    void expect(std::string_view text);
     std::string identifier();
     AST body();
     StmtNode statement();
