@@ -1,13 +1,10 @@
-#include "interpreter.h"
-#include "common/utils.h"
+#include "interpreter/interpreter.h"
 
-bool interpret(std::istream& ast_input, std::istream& input, std::ostream& output) {
-    NTomatoInterpretato::Interpreter interpretator(input, output);
-    auto builder = NTomatoInterpretato::CreateAstBuilder(
-        NTomatoInterpretato::BuilderSettings{
-            .mode = NTomatoInterpretato::EBuilderMode::JSON
-        },
-        ast_input
-    );
-    return interpretator.interpret(builder);
+namespace NTomatoInterpretato {
+
+void Interpreter::interpret(const NAst::AST& ast) {
+    env_.clear();
+    for (const auto& stmt : ast) stmt->execute(env_);
+}
+
 }
