@@ -18,6 +18,5 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
-include_directories(lib)
 add_subdirectory(lib)
 add_subdirectory(bin)

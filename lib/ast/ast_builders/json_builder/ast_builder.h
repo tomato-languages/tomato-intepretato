@@ -1,32 +1,21 @@
 #pragma once
 #include <nlohmann/json.hpp>
-#include "ast/ast_builders/ast_builder.h"
+#include "ast/ast.h"
 
-namespace NTomatoInterpretato {
-namespace NAst {
+namespace NTomatoInterpretato::NAst {
 
-class JsonAstBuilder : public IAstBuilder {
+class JsonAstBuilder {
 public:
-    using Json = nlohmann::json;
-
-    JsonAstBuilder() {}
-    JsonAstBuilder(const Json& json) : json_(json) {}
-
-    JsonAstBuilder& withJson(const Json& json);
-    void withBuiltin(const Builtins& builtins) override;
-    void build(AST& ast) override;
+    JsonAstBuilder(std::istream& input = std::cin, std::ostream& output = std::cout)
+        : input_(input), output_(output) {}
+    AST build(const nlohmann::json& json) const;
 
 private:
-    Builtins builtins_;
-    Json json_;
-
-    std::vector<StmtNode> build_body(const Json& json) const;
-    void build_body(const Json& json, std::vector<StmtNode>& body) const;
-    StmtNode build_stmt(const Json& json) const;
-    ExprNode build_expr(const Json& json) const;
-
-    ExprNode call_builtin(const std::string& name, ExprNode&& arg) const;
+    std::istream& input_;
+    std::ostream& output_;
+    void build_body(const nlohmann::json& json, AST& body) const;
+    StmtNode build_stmt(const nlohmann::json& json) const;
+    ExprNode build_expr(const nlohmann::json& json) const;
 };
 
-}
 }

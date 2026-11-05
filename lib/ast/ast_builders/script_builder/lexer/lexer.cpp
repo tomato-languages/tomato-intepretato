@@ -1,207 +1,66 @@
-#include "lexer.h"
-#include <iostream>
+#include "ast/ast_builders/script_builder/lexer/lexer.h"
 #include <cctype>
 
-namespace NTomatoInterpretato {
-namespace NAst {
+namespace NTomatoInterpretato::NAst {
 
-std::unordered_map<std::string, TokenType> Lexer::keywords = {
-    {"if", TokenType::If},
-    {"then", TokenType::Then},
-    {"else", TokenType::Else},
-
-    {"while", TokenType::While},
-    {"for", TokenType::For},
-    {"in", TokenType::In},
-    {"end", TokenType::End},
-
-    {"break", TokenType::Break},
-    {"continue", TokenType::Continue},
-
-    {"function", TokenType::Function},
-    {"return", TokenType::Return},
-
-    {"true", TokenType::True},
-    {"false", TokenType::False},
-    {"nil", TokenType::Nil},
-
-    {"and", TokenType::And},
-    {"or", TokenType::Or},
-    {"not", TokenType::Not},
-
-    {"=", TokenType::Assign},
-
-    {"==", TokenType::Equal},
-    {"!=", TokenType::NotEqual},
-
-    {">", TokenType::Greater},
-    {">=", TokenType::GreaterEqual},
-    
-    {"<", TokenType::Less},
-    {"<=", TokenType::LessEqual},
-
-    {"+", TokenType::Plus},
-    {"+=", TokenType::PlusAssign},
-    {"-", TokenType::Minus},
-    {"-=", TokenType::MinusAssign},
-    {"*", TokenType::Star},
-    {"*=", TokenType::StarAssign},
-    {"/", TokenType::Slash},
-    {"/=", TokenType::SlashAssign},
-    {"^", TokenType::Caret},
-    {"^=", TokenType::CaretAssign},
-    {"%", TokenType::Percent},
-    {"%=", TokenType::PercentAssign},
-
-    {",", TokenType::Comma},
-    {":", TokenType::Colon},
-    {"(", TokenType::LParen},
-    {")", TokenType::RParen},
-    {"[", TokenType::LBracket},
-    {"]", TokenType::RBracket}
-
-};
-
-
-Token Lexer::NextToken() {
-
-    while (!stream_.eof() && (stream_.peek() == ' ' || stream_.peek() == '\n' || stream_.peek() == '\t')) StreamGet();
-
-    
-    if (stream_.eof()) {
-        return current_token_ = Token{TokenType::EndOfFile, "", current_position_};
+int Lexer::take() {
+    int ch = input_.get();
+    if (ch == '\n') {
+        ++position_.line;
+        position_.column = 1;
+    } else if (ch != std::char_traits<char>::eof()) {
+        ++position_.column;
     }
-    
-    char peek = stream_.peek();
+    return ch;
+}
 
-    if (peek == '/') {
-        if (StreamGet() == '/') {
-
-        return current_token_ = SkipComment();
-        } else {
-            StreamUnget();
+Token Lexer::next() {
+    while (true) {
+        while (input_.peek() != std::char_traits<char>::eof() &&
+               std::isspace(static_cast<unsigned char>(input_.peek()))) take();
+        Pos start = position_;
+        int ch = take();
+        if (ch == std::char_traits<char>::eof()) return {Token::Kind::End, "", start};
+        if (ch == '-' && input_.peek() == '-') {
+            while (input_.peek() != '\n' && input_.peek() != std::char_traits<char>::eof()) take();
+            continue;
         }
-    }
-
-
-    if (isalpha(peek) || peek == '_') {
-        return current_token_ = IdentifierOrKeyword();
-    } else if (isdigit(peek)) {
-        return current_token_ = Number();
-    } else if (peek == '"') {
-        return current_token_ = String();
-    } else { 
-        return current_token_ = Symbol();
-    }
-}
-
-Token Lexer::PeekToken() {
-
-
-    return current_token_;
-}
-
-
-
-Token Lexer::SkipComment() {
-
-    StreamGet();
-    while (stream_.peek() != '\n' && !stream_.eof()) StreamGet();
-    StreamGet();
-
-    return Token{TokenType::Comment, "", current_position_};
-
-}
-
-Token Lexer::IdentifierOrKeyword() {
-
-    std::string value;
-
-    while (isalnum(stream_.peek()) || stream_.peek() == '_') value += StreamGet();
-
-    if (keywords.contains(value)) {
-        return Token{keywords[value], value};
-    } else {
-        return Token{TokenType::Identifier, value, current_position_};
-    }
-
-}
-
-Token Lexer::Number() {
-
-    std::string value;
-
-    while (std::isdigit(stream_.peek())) {
-        value += StreamGet();
-    }
-
-    if (stream_.peek() == '.') {
-        value += StreamGet();
-        while (std::isdigit(stream_.peek())) {
-            value += StreamGet();
+        if (ch == '(' && input_.peek() == '*') {
+            take();
+            while (true) {
+                int current = take();
+                if (current == std::char_traits<char>::eof()) throw ast_error("Unterminated comment", start);
+                if (current == '*' && input_.peek() == ')') {
+                    take();
+                    break;
+                }
+            }
+            continue;
         }
-    }
-
-    if (stream_.peek() == 'e' || stream_.peek() == 'E') {
-        value += StreamGet();
-        if (stream_.peek() == '+' || stream_.peek() == '-') {
-            value += StreamGet();
+        std::string text(1, static_cast<char>(ch));
+        if (ch >= 'a' && ch <= 'z') {
+            while (input_.peek() != std::char_traits<char>::eof()) {
+                int next = input_.peek();
+                if (!std::isalnum(static_cast<unsigned char>(next)) && next != '_' && next != '\'') break;
+                text += static_cast<char>(take());
+            }
+            return {Token::Kind::Identifier, text, start};
         }
-        while (std::isdigit(stream_.peek())) {
-            value += StreamGet();
+        if (ch >= '0' && ch <= '9') {
+            while (input_.peek() >= '0' && input_.peek() <= '9') text += static_cast<char>(take());
+            return {Token::Kind::Number, text, start};
         }
-    }
-
-
-    return Token{TokenType::Number, value, current_position_};
-
-}
-
-Token Lexer::String() {
-
-    std::string value;
-
-    StreamGet();
-
-    while (stream_.peek() != '"' && !stream_.eof()) {
-        if (stream_.peek() == '\\') {
-            StreamGet();
-            value += StreamGet();
-        } else {
-            value += StreamGet();
-
+        if ((ch == '!' && (input_.peek() == '!' || input_.peek() == '=')) ||
+            (ch == '&' && input_.peek() == '&') ||
+            ((ch == '=' || ch == '<' || ch == '>') && input_.peek() == '=')) {
+            text += static_cast<char>(take());
+            return {Token::Kind::Symbol, text, start};
         }
-    }
-
-    StreamGet();
-
-    return Token{TokenType::String, value, current_position_};
-
-
-}
-
-Token Lexer::Symbol() {
-
-    char c1 = StreamGet();
-    char c2 = StreamGet();
-    std::string symbol(1, c1);
-    if (!stream_.eof()) {
-        if (c2 == '=') {
-            symbol += c2;
-        } else if (c2 != 0) {
-            StreamUnget();
+        if (text.find_first_not_of("{}();=+-*/%<>") == std::string::npos) {
+            return {Token::Kind::Symbol, text, start};
         }
+        throw ast_error("Unexpected character: " + text, start);
     }
-
-    if (keywords.contains(symbol)) {
-        return Token{keywords[symbol], symbol, current_position_};
-    } else {
-        throw lexer_error("Unknown token", current_position_);
-    }
-
-}
-
-
 }
 
 }

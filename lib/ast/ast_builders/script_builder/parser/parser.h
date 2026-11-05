@@ -1,78 +1,29 @@
 #pragma once
-#include "lexer.h"
 #include "ast/ast.h"
+#include "ast/ast_builders/script_builder/lexer/lexer.h"
 
-template <typename T, typename... Args>
-bool EqualAtLeast(T lhs, Args... rhs) {
-    if (((lhs == rhs) || ...)) {
-        return true;
-    }
-    return false;
-}
-
-namespace NTomatoInterpretato {
-namespace NAst {
+namespace NTomatoInterpretato::NAst {
 
 class Parser {
-
 public:
-
-    Parser(Lexer& lexer, AST& ast, const Builtins& builtins)
-        : lexer_(lexer)
-        , ast_(ast)
-        , builtins_(builtins)
-    {}
-
-    bool parse() {
-        
-        Token token = lexer_.NextToken();
-        
-        if (token.type == TokenType::EndOfFile) {
-            return false;
-        }
-
-        while (lexer_.PeekToken().type != TokenType::EndOfFile) {
-            
-            if (lexer_.PeekToken().type == TokenType::Comment) {
-                token = lexer_.NextToken();
-                continue;
-            }
-
-            ast_.push_back(ParseStatement());
-        }
-        
- 
-        return true;
-
-    }
-
-
-
+    Parser(Lexer& lexer, std::istream& input, std::ostream& output)
+        : lexer_(lexer), input_(input), output_(output), token_(lexer_.next()) {}
+    AST parse();
 
 private:
     Lexer& lexer_;
-    AST& ast_;
-    const Builtins& builtins_;
+    std::istream& input_;
+    std::ostream& output_;
+    Token token_;
 
-
-
-    ExprNode ParseExpression();
-    ExprNode ParseAssignment();
-    ExprNode ParseLogicOr();
-    ExprNode ParseLogicAnd();
-    ExprNode ParseEquality();
-    ExprNode ParseComparison();
-    ExprNode ParseAdditive();
-    ExprNode ParseMultiplicative();
-    ExprNode ParseUnary();
-    ExprNode ParsePrimary();
-    ExprNode ParsePostfix(ExprNode&& var_node);
-
-    StmtNode ParseStatement();
-    StmtNode ParseIfStmt();
-    StmtNode ParseWhileStmt();
-    StmtNode ParseForStmt();
+    bool accept(const std::string& text);
+    void expect(const std::string& text);
+    std::string identifier();
+    AST body();
+    StmtNode statement();
+    StmtNode branch();
+    ExprNode expression(int minimum = 1);
+    ExprNode primary();
 };
 
-}
 }

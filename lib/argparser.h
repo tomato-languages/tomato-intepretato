@@ -32,9 +32,9 @@ class ArgumentCarrage {
 		bool is_flag {false};
 
 		bool is_positional {false};
-		
+
 		bool is_help {false};
-		
+
 		bool need_to_set {true};
 
 		ArgumentCarrage(ArgParser &parent)
@@ -51,7 +51,7 @@ class ArgumentCarrage {
 			, is_flag (flag)
 		{}
 
-		ArgumentCarrage(ArgParser &parent, const bool &flag, const bool &help, const std::string &description) 
+		ArgumentCarrage(ArgParser &parent, const bool &flag, const bool &help, const std::string &description)
 			: parent_ (&parent)
 			, is_flag (flag)
 			, is_help (help)
@@ -81,15 +81,15 @@ class ArgumentValue : public ArgumentCarrage {
 
 	public:
 
-		
+
 
 		ArgumentValue() = default;
 
-		ArgumentValue(ArgParser &parent, const bool &flag, const bool &help) 
+		ArgumentValue(ArgParser &parent, const bool &flag, const bool &help)
 			: ArgumentCarrage (parent, flag, help)
 		{}
 
-		ArgumentValue(ArgParser &parent, const bool &flag, const bool &help, const std::string &description) 
+		ArgumentValue(ArgParser &parent, const bool &flag, const bool &help, const std::string &description)
 			: ArgumentCarrage (parent, flag, help, description)
 		{}
 
@@ -120,12 +120,12 @@ class ArgumentValue : public ArgumentCarrage {
 
 };
 class ArgParser {
-    
+
 	public:
 
 		ArgParser() = default;
 
-        ArgParser(const std::string &parser_name) 
+        ArgParser(const std::string &parser_name)
             : parser_name_ (parser_name)
         {}
 
@@ -134,7 +134,7 @@ class ArgParser {
 				delete it->second;
 			}
 		}
-		
+
 		bool Parse(int argc, char** argv);
 		bool Parse(const std::vector<std::string> &argv);
 
@@ -176,7 +176,7 @@ class ArgParser {
 
 		template <typename V>
 		ArgumentValue<V>& AddArgument(const std::string &long_arg, const bool& is_flag, const bool& is_help);
-		
+
 		template <typename V>
 		ArgumentValue<V>& AddArgument(const char &short_arg, const std::string &long_arg, const bool& is_flag, const bool& is_help);
 
@@ -204,7 +204,7 @@ class ArgParser {
 		friend class ArgumentValue;
 };
 
-} // namespace ArgumentParser
+}
 
 
 
@@ -213,7 +213,7 @@ using namespace ArgumentParser;
 
 template <typename V>
 ArgumentValue<V>& ArgumentValue<V>::SetValue(const std::string &value)  {
-    
+
     need_to_set = false;
     if (!is_multi) {
         if constexpr (std::is_same_v<V, int>) {
@@ -228,7 +228,7 @@ ArgumentValue<V>& ArgumentValue<V>::SetValue(const std::string &value)  {
             p_vector_->push_back(value);
         }
     }
-    
+
     return *this;
 }
 
@@ -236,7 +236,7 @@ template <typename V>
 ArgumentValue<V>& ArgumentValue<V>::SetValue(const bool &flag)  {
     need_to_set = false;
     *variable_ = flag;
-    
+
     return *this;
 }
 
@@ -311,14 +311,14 @@ ArgumentValue<V>& ArgumentValue<V>::StoreValues(std::vector<V> &variable) {
 template <typename V>
 std::variant<int, std::string, bool, std::vector<std::string>, std::vector<int>> ArgumentValue<V>::GetValue() const {
     if constexpr (std::is_same_v<V, bool>) {
-        return *variable_;  
+        return *variable_;
     } else {
         if (is_multi) {
-            return *p_vector_; 
+            return *p_vector_;
         } else {
-            return *variable_;  
+            return *variable_;
         }
-    }    
+    }
 }
 
 
@@ -330,7 +330,7 @@ bool ArgParser::Parse(int argc, char** argv) {
         size_t pos;
 
         if (arg.substr(0,2) == "--") {
-            
+
             if ((pos = arg.find_first_of('=', 2)) != std::string::npos) {
                 std::string param = arg.substr(2, pos-2);
                 std::string value = arg.substr(pos+1, arg.length());
@@ -341,7 +341,7 @@ bool ArgParser::Parse(int argc, char** argv) {
 
                 argument_carrage->SetValue(value);
 
-            } else {							
+            } else {
                 std::string param = arg.substr(2, arg.length()-2);
 
                 if (!arguments_.contains(param)) return false;
@@ -357,7 +357,7 @@ bool ArgParser::Parse(int argc, char** argv) {
                     argument_carrage->SetValue(true);
                 } else {
                     current++;
-                    if (current >= argc || argv[current][0] == '-') return false; // ARGUMENT_W_O_VALUE
+                    if (current >= argc || argv[current][0] == '-') return false;
 
                     if (argument_carrage->is_multi) {
 
@@ -386,8 +386,8 @@ bool ArgParser::Parse(int argc, char** argv) {
                     argument_carrage->SetValue(value);
                 }
 
-            } else {							
-                
+            } else {
+
                 for (int i = 1; i < arg.length(); i++) {
 
                     if (!arguments_.contains(alias_[arg[i]])) return false;
@@ -407,7 +407,7 @@ bool ArgParser::Parse(int argc, char** argv) {
                     } else {
 
                         current++;
-                        if (current >= argc || argv[current][0] == '-') return false; // ARGUMENT_W_O_VALUE
+                        if (current >= argc || argv[current][0] == '-') return false;
 
                         if (argument_carrage->is_multi) {
                             while (current < argc && argv[current][0] != '-') {
@@ -423,7 +423,7 @@ bool ArgParser::Parse(int argc, char** argv) {
                 }
             }
 
-        } else { // Positional if exist
+        } else {
             if (positional_arg_ != nullptr) {
                 if (positional_arg_->is_multi) {
                     while (current < argc && argv[current][0] != '-') {
@@ -434,15 +434,14 @@ bool ArgParser::Parse(int argc, char** argv) {
 
                     positional_arg_->SetValue(std::string(argv[current]));
                 }
-                
+
             } else {
                 return false;
             }
         }
-        
+
     }
 
-    // MinCountMultiValue if
     for (auto it = arguments_.begin(); it != arguments_.end(); it++) {
         if ((it->second->is_multi && it->second->GetCountMultiValue() < it->second->min_count_multi_value) || it->second->need_to_set) return false;
     }
@@ -458,7 +457,7 @@ bool ArgParser::Parse(const std::vector<std::string> &argv) {
         size_t pos;
 
         if (arg.substr(0,2) == "--") {
-            
+
             if ((pos = arg.find_first_of('=', 2)) != std::string::npos) {
                 std::string param = arg.substr(2, pos-2);
                 std::string value = arg.substr(pos+1, arg.length());
@@ -469,7 +468,7 @@ bool ArgParser::Parse(const std::vector<std::string> &argv) {
 
                 argument_carrage->SetValue(value);
 
-            } else {							
+            } else {
                 std::string param = arg.substr(2, arg.length()-2);
 
                 if (!arguments_.contains(param)) return false;
@@ -485,7 +484,7 @@ bool ArgParser::Parse(const std::vector<std::string> &argv) {
                     argument_carrage->SetValue(true);
                 } else {
                     current++;
-                    if (current >= argc || argv[current][0] == '-') return false; // ARGUMENT_W_O_VALUE
+                    if (current >= argc || argv[current][0] == '-') return false;
 
                     if (argument_carrage->is_multi) {
 
@@ -514,8 +513,8 @@ bool ArgParser::Parse(const std::vector<std::string> &argv) {
                     argument_carrage->SetValue(value);
                 }
 
-            } else {							
-                
+            } else {
+
                 for (int i = 1; i < arg.length(); i++) {
 
                     if (!arguments_.contains(alias_[arg[i]])) return false;
@@ -535,7 +534,7 @@ bool ArgParser::Parse(const std::vector<std::string> &argv) {
                     } else {
 
                         current++;
-                        if (current >= argc || argv[current][0] == '-') return false; // ARGUMENT_W_O_VALUE
+                        if (current >= argc || argv[current][0] == '-') return false;
 
                         if (argument_carrage->is_multi) {
                             while (current < argc && argv[current][0] != '-') {
@@ -551,7 +550,7 @@ bool ArgParser::Parse(const std::vector<std::string> &argv) {
                 }
             }
 
-        } else { // Positional if exist
+        } else {
             if (positional_arg_ != nullptr) {
                 if (positional_arg_->is_multi) {
                     while (current < argc && argv[current][0] != '-') {
@@ -562,15 +561,14 @@ bool ArgParser::Parse(const std::vector<std::string> &argv) {
 
                     positional_arg_->SetValue(std::string(argv[current]));
                 }
-                
+
             } else {
                 return false;
             }
         }
-        
+
     }
 
-    // MinCountMultiValue if
     for (auto it = arguments_.begin(); it != arguments_.end(); it++) {
         if ((it->second->is_multi && it->second->GetCountMultiValue() < it->second->min_count_multi_value) || it->second->need_to_set) return false;
     }
@@ -578,9 +576,6 @@ bool ArgParser::Parse(const std::vector<std::string> &argv) {
     return true;
 }
 
-// bool ArgParser::Parse(std::vector<std::string> &input_args) {
-//     return Parse(input_args.size(), );
-// }
 
 ArgumentValue<std::string>& ArgParser::AddStringArgument(const std::string &long_arg) {
     return AddArgument<std::string>(long_arg, false, false);
@@ -643,7 +638,7 @@ ArgumentValue<std::string>& ArgParser::AddHelp(const char &short_arg, const std:
 std::string ArgParser::HelpDescription() {
 	std::string result {};
 
-    result += help_arg_->description_; 
+    result += help_arg_->description_;
 
     for (auto it = arguments_.begin(); it != arguments_.end(); it++) {
         if (isblank(it->second->short_arg_) && !(it->second->is_help)) {
@@ -720,7 +715,7 @@ ArgumentValue<V>& ArgParser::AddArgument(const std::string &long_arg, const bool
 
     if (is_help) {
         if (help_arg_ != nullptr) ErrorMessage("Help argument already exist", HELP_ALREADY_EXIST_ERROR);
-        else help_arg_ = argument; 
+        else help_arg_ = argument;
     }
     if (is_flag || is_help) argument->need_to_set = false;
 
@@ -739,7 +734,7 @@ ArgumentValue<V>& ArgParser::AddArgument(const char &short_arg, const std::strin
 
     if (is_help) {
         if (help_arg_ != nullptr) ErrorMessage("Help argument already exist", HELP_ALREADY_EXIST_ERROR);
-        else help_arg_ = argument; 
+        else help_arg_ = argument;
     }
     if (is_flag || is_help) argument->need_to_set = false;
 
@@ -758,7 +753,7 @@ ArgumentValue<V>& ArgParser::AddArgument(const char &short_arg, const std::strin
 
     if (is_help) {
         if (help_arg_ != nullptr) ErrorMessage("Help argument already exist", HELP_ALREADY_EXIST_ERROR);
-        else help_arg_ = argument; 
+        else help_arg_ = argument;
     }
     if (is_flag || is_help) argument->need_to_set = false;
 
@@ -774,7 +769,7 @@ ArgumentValue<V>& ArgParser::AddArgument(const std::string &long_arg, const std:
 
     if (is_help) {
         if (help_arg_ != nullptr) ErrorMessage("Help argument already exist", HELP_ALREADY_EXIST_ERROR);
-        else help_arg_ = argument; 
+        else help_arg_ = argument;
     }
     if (is_flag || is_help) argument->need_to_set = false;
 

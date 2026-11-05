@@ -1,103 +1,38 @@
 #pragma once
-#include <exception>
+#include <stdexcept>
 #include <string>
 
 namespace NTomatoInterpretato {
 
 struct Pos {
-    int line;
-    int column;
+    int line = 0;
+    int column = 0;
+
+    Pos(int line = 0, int column = 0) : line(line), column(column) {}
 
     std::string to_string() const {
         return "Line: " + std::to_string(line) + ", Column: " + std::to_string(column) + ". ";
     }
 
-    operator bool() const {
-        if (line == 0 && column == 0) return false;
-        return true;
+    explicit operator bool() const {
+        return line != 0 || column != 0;
     }
-
-    Pos(int l = 0, int c = 0) : line(l), column(c) {}
 };
 
-class basic_error : public std::exception {
+class basic_error : public std::runtime_error {
 public:
-    basic_error(std::string&& msg, Pos position)
-        : msg_(std::move(msg))
-        , pos_(position)
-    {
-        update_what();
-    }
-
-    virtual const char* what() const noexcept override = 0;
-
-protected:
-    std::string msg_;
-    Pos pos_;
-    // debug info in future
-
-    void update_what() {
-        if (pos_) {
-            msg_ = pos_.to_string() + msg_;
-        }
-    }
-
-   
-
-};
-
-class parsing_error : public basic_error {
-public:
-
-    parsing_error(std::string&& msg, Pos position) 
-        : basic_error(std::move(msg), position)
-    {}
-
-    const char* what() const noexcept override {
-        return msg_.c_str();
-    }
-
-
-};
-
-class lexer_error : public basic_error {
-public:
-
-    lexer_error(std::string&& msg, Pos position) 
-        : basic_error(std::move(msg), position)
-    {}
-
-    const char* what() const noexcept override {
-        return msg_.c_str();
-    }
-
-
+    explicit basic_error(const std::string& message, Pos position = Pos())
+        : std::runtime_error((position ? position.to_string() : "") + message) {}
 };
 
 class interpret_error : public basic_error {
 public:
-
-    interpret_error(std::string&& msg, Pos position = Pos()) 
-        : basic_error(std::move(msg), position)
-    {}
-
-    const char* what() const noexcept override {
-        return msg_.c_str();
-    }
-
+    using basic_error::basic_error;
 };
 
 class ast_error : public basic_error {
 public:
-
-    ast_error(std::string&& msg, Pos position = Pos())
-        : basic_error(std::move(msg), position)
-    {}
-
-    const char* what() const noexcept override {
-        return msg_.c_str();
-    }
-
+    using basic_error::basic_error;
 };
 
 }
