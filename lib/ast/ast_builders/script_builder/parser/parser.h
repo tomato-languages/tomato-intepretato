@@ -18,6 +18,7 @@ private:
     Token token_;
     int depth_ = 0;
 
+    bool at(std::string_view text) const;
     bool accept(std::string_view text);
     void expect(std::string_view text);
     std::string identifier();
@@ -25,6 +26,7 @@ private:
     StmtNode statement();
     StmtNode branch();
     ExprNode expression(int minimum = 1);
+    ExprNode postfix();
     ExprNode primary();
 };
 

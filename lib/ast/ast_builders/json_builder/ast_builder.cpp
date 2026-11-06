@@ -60,6 +60,11 @@ StmtNode JsonAstBuilder::build_stmt(const Json& json, int depth) const {
         return std::make_unique<AssignStmt>(assign.at("dst").get<std::string>(),
             build_expr(assign.at("src"), depth + 1));
     }
+    if (json.contains("set")) {
+        const auto& set = json.at("set");
+        return std::make_unique<SetElemStmt>(build_expr(set.at("dst"), depth + 1),
+            build_expr(set.at("idx"), depth + 1), build_expr(set.at("value"), depth + 1));
+    }
     if (json.contains("if")) {
         const auto& branch = json.at("if");
         AST then_body, else_body;
@@ -99,10 +104,30 @@ ExprNode JsonAstBuilder::build_expr(const Json& json, int depth) const {
     if (json.contains("const")) {
         const auto& value = json.at("const");
         if (!value.is_number_integer() || (value.is_number_unsigned() &&
-            value.get<std::uint64_t>() > static_cast<std::uint64_t>(std::numeric_limits<Value>::max()))) {
+            value.get<std::uint64_t>() > static_cast<std::uint64_t>(std::numeric_limits<Integer>::max()))) {
             throw ast_error("Expected a 64-bit integer: " + describe(value));
         }
-        return std::make_unique<NumberExpr>(value.get<Value>());
+        return std::make_unique<NumberExpr>(value.get<Integer>());
+    }
+    if (json.contains("string")) {
+        std::string text = json.at("string").get<std::string>();
+        if (text.size() >= 2 && text.front() == '"' && text.back() == '"') text = text.substr(1, text.size() - 2);
+        return std::make_unique<StringExpr>(text);
+    }
+    if (json.contains("array")) {
+        const auto& items = json.at("array");
+        if (!items.is_array() || items.empty()) throw ast_error("Expected a non-empty array: " + describe(items));
+        std::vector<ExprNode> elements;
+        elements.reserve(items.size());
+        for (const auto& item : items) elements.push_back(build_expr(item, depth + 1));
+        return std::make_unique<ArrayExpr>(std::move(elements));
+    }
+    if (json.contains("elem")) {
+        return std::make_unique<ElemExpr>(build_expr(json.at("elem"), depth + 1),
+            build_expr(json.at("index"), depth + 1));
+    }
+    if (json.contains("length")) {
+        return std::make_unique<LengthExpr>(build_expr(json.at("length"), depth + 1));
     }
     if (json.contains("var")) {
         return std::make_unique<VariableExpr>(json.at("var").get<std::string>(), Pos());

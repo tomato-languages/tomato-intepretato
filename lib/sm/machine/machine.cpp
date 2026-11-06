@@ -1,4 +1,5 @@
 #include "sm/machine/machine.h"
+#include <memory>
 
 namespace NTomatoInterpretato {
 namespace NSm {
@@ -77,7 +78,7 @@ bool StackMachine::run(const Program& program) {
                 break;
 
             case EOpcode::Read: {
-                Value input;
+                Integer input;
                 if (!(input_ >> input)) {
                     throw interpret_error("READ: expected an integer on input", instruction.position);
                 }
@@ -86,13 +87,48 @@ bool StackMachine::run(const Program& program) {
             }
 
             case EOpcode::Write:
-                output_ << pop(instruction) << '\n';
+                ValueOps::Write(output_, pop(instruction));
                 break;
 
             case EOpcode::Binop: {
                 Value rhs = pop(instruction);
                 Value lhs = pop(instruction);
                 stack_.push_back(ValueOps::Apply(instruction.op, lhs, rhs));
+                break;
+            }
+
+            case EOpcode::Array: {
+                const auto count = static_cast<std::size_t>(instruction.value);
+                if (stack_.size() < count) {
+                    throw interpret_error(to_string(instruction) + ": stack is empty", instruction.position);
+                }
+                auto array = std::make_shared<ArrayData>();
+                array->elements.resize(count);
+                for (std::size_t i = count; i > 0; --i) array->elements[i - 1] = pop(instruction);
+                stack_.push_back(std::move(array));
+                break;
+            }
+
+            case EOpcode::String:
+                stack_.push_back(std::make_shared<std::string>(instruction.text));
+                break;
+
+            case EOpcode::Length:
+                stack_.push_back(ValueOps::Length(pop(instruction)));
+                break;
+
+            case EOpcode::Elem: {
+                Value index = pop(instruction);
+                Value container = pop(instruction);
+                stack_.push_back(ValueOps::Elem(container, index));
+                break;
+            }
+
+            case EOpcode::Set: {
+                Value value = pop(instruction);
+                Value index = pop(instruction);
+                Value container = pop(instruction);
+                ValueOps::SetElem(container, index, value);
                 break;
             }
 
@@ -104,14 +140,14 @@ bool StackMachine::run(const Program& program) {
                 continue;
 
             case EOpcode::Jz:
-                if (pop(instruction) == 0) {
+                if (!ValueOps::IsTrue(pop(instruction))) {
                     ip = jump_to(instruction);
                     continue;
                 }
                 break;
 
             case EOpcode::Jnz:
-                if (pop(instruction) != 0) {
+                if (ValueOps::IsTrue(pop(instruction))) {
                     ip = jump_to(instruction);
                     continue;
                 }
