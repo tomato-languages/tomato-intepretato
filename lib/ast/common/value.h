@@ -1,5 +1,8 @@
 #pragma once
+#include <cctype>
+#include <charconv>
 #include <cstdint>
+#include <istream>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -207,6 +210,54 @@ inline void Write(std::ostream& output, const Value& value) {
     std::vector<const ArrayData*> path;
     Format(value, text, path);
     output << text << '\n';
+}
+
+inline void SkipSpaces(std::istream& input) {
+    while (input.peek() != std::char_traits<char>::eof() && std::isspace(input.peek())) input.get();
+}
+
+inline Integer ReadInteger(std::istream& input) {
+    std::string digits;
+    if (input.peek() == '-' || input.peek() == '+') digits += static_cast<char>(input.get());
+    const std::size_t sign = digits.size();
+    while (input.peek() >= '0' && input.peek() <= '9') digits += static_cast<char>(input.get());
+    if (digits.size() == sign) throw interpret_error("integer or array expected on input");
+    const char* first = digits.data() + (digits[0] == '+' ? 1 : 0);
+    Integer value;
+    auto result = std::from_chars(first, digits.data() + digits.size(), value);
+    if (result.ec != std::errc()) throw interpret_error("integer on input is out of range");
+    return value;
+}
+
+inline Value ReadValue(std::istream& input) {
+    SkipSpaces(input);
+    while (input.peek() == ',') {
+        input.get();
+        SkipSpaces(input);
+    }
+    if (input.peek() == std::char_traits<char>::eof()) throw interpret_error("input exhausted");
+    std::vector<ArrayRef> open;
+    while (true) {
+        SkipSpaces(input);
+        if (input.peek() == '[') {
+            input.get();
+            open.push_back(std::make_shared<ArrayData>());
+            SkipSpaces(input);
+            if (input.peek() == ']') throw interpret_error("empty array on input");
+            continue;
+        }
+        Value current = ReadInteger(input);
+        while (true) {
+            if (open.empty()) return current;
+            open.back()->elements.push_back(std::move(current));
+            SkipSpaces(input);
+            const int next = input.get();
+            if (next == ',') break;
+            if (next != ']') throw interpret_error("',' or ']' expected on input");
+            current = std::move(open.back());
+            open.pop_back();
+        }
+    }
 }
 
 }

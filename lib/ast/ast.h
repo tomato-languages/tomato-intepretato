@@ -290,11 +290,13 @@ public:
         : name_(name), input_(input) {}
 
     void execute(Environment& env) const override {
-        Integer value;
-        if (!(input_ >> value)) {
-            throw interpret_error("read(" + name_ + "): expected an integer on input");
+        Value value;
+        try {
+            value = ValueOps::ReadValue(input_);
+        } catch (const interpret_error& error) {
+            throw interpret_error("read(" + name_ + "): " + error.what());
         }
-        env[name_] = value;
+        env[name_] = std::move(value);
     }
 
     void compile(NSm::Program& program) const override {

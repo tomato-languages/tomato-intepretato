@@ -78,11 +78,13 @@ bool StackMachine::run(const Program& program) {
                 break;
 
             case EOpcode::Read: {
-                Integer input;
-                if (!(input_ >> input)) {
-                    throw interpret_error("READ: expected an integer on input", instruction.position);
+                Value input;
+                try {
+                    input = ValueOps::ReadValue(input_);
+                } catch (const interpret_error& error) {
+                    throw interpret_error(std::string("READ: ") + error.what(), instruction.position);
                 }
-                stack_.push_back(input);
+                stack_.push_back(std::move(input));
                 break;
             }
 
