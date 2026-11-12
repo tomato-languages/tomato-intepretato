@@ -221,12 +221,23 @@ inline Integer ReadInteger(std::istream& input) {
     if (input.peek() == '-' || input.peek() == '+') digits += static_cast<char>(input.get());
     const std::size_t sign = digits.size();
     while (input.peek() >= '0' && input.peek() <= '9') digits += static_cast<char>(input.get());
-    if (digits.size() == sign) throw interpret_error("integer or array expected on input");
+    if (digits.size() == sign) throw interpret_error("integer, string or array expected on input");
     const char* first = digits.data() + (digits[0] == '+' ? 1 : 0);
     Integer value;
     auto result = std::from_chars(first, digits.data() + digits.size(), value);
     if (result.ec != std::errc()) throw interpret_error("integer on input is out of range");
     return value;
+}
+
+inline StringRef ReadString(std::istream& input) {
+    input.get();
+    auto text = std::make_shared<std::string>();
+    while (true) {
+        const int ch = input.get();
+        if (ch == std::char_traits<char>::eof()) throw interpret_error("unterminated string on input");
+        if (ch == '"') return text;
+        *text += static_cast<char>(ch);
+    }
 }
 
 inline Value ReadValue(std::istream& input) {
@@ -246,7 +257,7 @@ inline Value ReadValue(std::istream& input) {
             if (input.peek() == ']') throw interpret_error("empty array on input");
             continue;
         }
-        Value current = ReadInteger(input);
+        Value current = input.peek() == '"' ? Value(ReadString(input)) : Value(ReadInteger(input));
         while (true) {
             if (open.empty()) return current;
             open.back()->elements.push_back(std::move(current));
