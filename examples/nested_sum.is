@@ -1,0 +1,31 @@
+{
+  read(data);
+  sum = 0;
+  arr = data;
+  i = 0;
+  stack = 0;
+  depth = 0;
+  going = 1;
+  while (going) {
+    if (i < arr.length) {
+      item = arr[i];
+      i += 1;
+      if (item[0] == 0) {
+        sum += item[1];
+      } else {
+        stack = [arr, i, stack];
+        depth += 1;
+        arr = item[1];
+        i = 0;
+      }
+    } elif (depth == 0) {
+      going = 0;
+    } else {
+      arr = stack[0];
+      i = stack[1];
+      stack = stack[2];
+      depth -= 1;
+    }
+  }
+  write(sum);
+}

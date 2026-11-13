@@ -6,7 +6,7 @@
 namespace NTomatoInterpretato::NAst {
 
 struct Token {
-    enum class Kind { End, Identifier, Number, Symbol };
+    enum class Kind { End, Identifier, Number, Symbol, String };
     Kind kind;
     std::string text;
     Pos position;

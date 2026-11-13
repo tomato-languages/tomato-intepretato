@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <memory>
 #include <iostream>
 #include <string>
@@ -6,6 +7,7 @@
 #include <unordered_map>
 #include "ast/common/value.h"
 #include "common/errors.h"
+#include "common/limits.h"
 #include "sm/program/program.h"
 
 namespace NTomatoInterpretato {
@@ -17,6 +19,7 @@ class BaseExpr {
 public:
 
     Pos position;
+    int height = 1;
 
     virtual Value evaluate(Environment& env) const = 0;
 
@@ -27,6 +30,12 @@ public:
     {}
 
     virtual ~BaseExpr() = default;
+
+protected:
+    void set_children_height(int children_height) {
+        height = children_height + 1;
+        if (height > kMaxNestingDepth) throw ast_error("Expression is nested too deeply", position);
+    }
 
 };
 class BaseStmt {
@@ -71,9 +80,9 @@ public:
 
 class NumberExpr : public BaseExpr {
 
-    Value value;
+    Integer value;
 public:
-    NumberExpr(Value val, Pos position = Pos())
+    NumberExpr(Integer val, Pos position = Pos())
         : BaseExpr(position)
         , value(val)
     {};
@@ -99,7 +108,9 @@ public:
         , op(op)
         , lhs(std::move(lhs))
         , rhs(std::move(rhs))
-    {}
+    {
+        set_children_height(std::max(this->lhs->height, this->rhs->height));
+    }
 
     Value evaluate(Environment& env) const override {
         Value left = lhs->evaluate(env);
@@ -112,6 +123,101 @@ public:
         lhs->compile(program);
         rhs->compile(program);
         program.emit_binop(op, position);
+    }
+
+};
+
+class StringExpr : public BaseExpr {
+    std::string text;
+
+public:
+    StringExpr(const std::string& text, Pos position = Pos())
+        : BaseExpr(position)
+        , text(text)
+    {}
+
+    Value evaluate(Environment& env) const override {
+        return std::make_shared<std::string>(text);
+    }
+
+    void compile(NSm::Program& program) const override {
+        program.emit_string(text, position);
+    }
+
+};
+
+class ArrayExpr : public BaseExpr {
+    std::vector<ExprNode> elements;
+
+public:
+    ArrayExpr(std::vector<ExprNode>&& elements, Pos position = Pos())
+        : BaseExpr(position)
+        , elements(std::move(elements))
+    {
+        int children_height = 0;
+        for (const auto& element : this->elements) children_height = std::max(children_height, element->height);
+        set_children_height(children_height);
+    }
+
+    Value evaluate(Environment& env) const override {
+        auto array = std::make_shared<ArrayData>();
+        array->elements.reserve(elements.size());
+        for (const auto& element : elements) array->elements.push_back(element->evaluate(env));
+        return array;
+    }
+
+    void compile(NSm::Program& program) const override {
+        for (const auto& element : elements) element->compile(program);
+        program.emit_array(static_cast<Integer>(elements.size()), position);
+    }
+
+};
+
+class ElemExpr : public BaseExpr {
+public:
+    ExprNode container;
+    ExprNode index;
+
+    ElemExpr(ExprNode&& container, ExprNode&& index, Pos position = Pos())
+        : BaseExpr(position)
+        , container(std::move(container))
+        , index(std::move(index))
+    {
+        set_children_height(std::max(this->container->height, this->index->height));
+    }
+
+    Value evaluate(Environment& env) const override {
+        Value target = container->evaluate(env);
+        Value position_value = index->evaluate(env);
+        return ValueOps::Elem(target, position_value);
+    }
+
+    void compile(NSm::Program& program) const override {
+        container->compile(program);
+        index->compile(program);
+        program.emit_elem(position);
+    }
+
+};
+
+class LengthExpr : public BaseExpr {
+    ExprNode value;
+
+public:
+    LengthExpr(ExprNode&& value, Pos position = Pos())
+        : BaseExpr(position)
+        , value(std::move(value))
+    {
+        set_children_height(this->value->height);
+    }
+
+    Value evaluate(Environment& env) const override {
+        return ValueOps::Length(value->evaluate(env));
+    }
+
+    void compile(NSm::Program& program) const override {
+        value->compile(program);
+        program.emit_length(position);
     }
 
 };
@@ -135,6 +241,46 @@ public:
     }
 };
 
+class SetElemStmt : public BaseStmt {
+    ExprNode container_;
+    ExprNode index_;
+    ExprNode value_;
+    std::string op_;
+
+public:
+    SetElemStmt(ExprNode&& container, ExprNode&& index, ExprNode&& value, const std::string& op = "")
+        : container_(std::move(container))
+        , index_(std::move(index))
+        , value_(std::move(value))
+        , op_(op)
+    {}
+
+    void execute(Environment& env) const override {
+        Value target = container_->evaluate(env);
+        Value position = index_->evaluate(env);
+        if (op_.empty()) {
+            ValueOps::SetElem(target, position, value_->evaluate(env));
+            return;
+        }
+        Value current = ValueOps::Elem(target, position);
+        Value operand = value_->evaluate(env);
+        ValueOps::SetElem(target, position, ValueOps::Apply(op_, current, operand));
+    }
+
+    void compile(NSm::Program& program) const override {
+        container_->compile(program);
+        index_->compile(program);
+        if (!op_.empty()) {
+            container_->compile(program);
+            index_->compile(program);
+            program.emit_elem(value_->position);
+        }
+        value_->compile(program);
+        if (!op_.empty()) program.emit_binop(op_, value_->position);
+        program.emit_set(value_->position);
+    }
+};
+
 class ReadStmt : public BaseStmt {
     std::string name_;
     std::istream& input_;
@@ -145,10 +291,12 @@ public:
 
     void execute(Environment& env) const override {
         Value value;
-        if (!(input_ >> value)) {
-            throw interpret_error("read(" + name_ + "): expected an integer on input");
+        try {
+            value = ValueOps::ReadValue(input_);
+        } catch (const interpret_error& error) {
+            throw interpret_error("read(" + name_ + "): " + error.what());
         }
-        env[name_] = value;
+        env[name_] = std::move(value);
     }
 
     void compile(NSm::Program& program) const override {
@@ -167,7 +315,7 @@ public:
 
     void execute(Environment& env) const override {
         Value value = value_->evaluate(env);
-        output_ << value << '\n';
+        ValueOps::Write(output_, value);
     }
 
     void compile(NSm::Program& program) const override {
@@ -193,7 +341,7 @@ public:
     {}
 
     void execute(Environment& env) const override {
-        const auto& body = condition_->evaluate(env) != 0 ? body_ : else_body_;
+        const auto& body = ValueOps::IsTrue(condition_->evaluate(env)) ? body_ : else_body_;
         for (const auto& stmt : body) stmt->execute(env);
     }
 
@@ -234,7 +382,7 @@ public:
 
     void execute(Environment& env) const override {
 
-        while (condition_->evaluate(env) != 0) {
+        while (ValueOps::IsTrue(condition_->evaluate(env))) {
             for (auto& it : body_) {
                 it->execute(env);
             }
@@ -279,7 +427,7 @@ public:
             for (auto& it : body_) {
                 it->execute(env);
             }
-        } while (condition_->evaluate(env) != 0);
+        } while (ValueOps::IsTrue(condition_->evaluate(env)));
 
     }
 
@@ -316,7 +464,7 @@ public:
             it->execute(env);
         }
 
-        while (condition_->evaluate(env) != 0) {
+        while (ValueOps::IsTrue(condition_->evaluate(env))) {
             for (auto& it : body_) {
                 it->execute(env);
             }
