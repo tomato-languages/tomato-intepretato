@@ -18,17 +18,22 @@ enum class EOpcode {
     Binop,
     Label,
     Jmp,
-    CJmpZero,
-    CJmpNotZero,
-    End
+    Jz,
+    Jnz,
+    Array,
+    String,
+    Length,
+    Elem,
+    Set
 };
 
 struct Instruction {
-    EOpcode opcode = EOpcode::End;
+    EOpcode opcode = EOpcode::Const;
 
-    Value value = 0;
+    Integer value = 0;
     std::string name;
     std::string op;
+    std::string text;
 
     Pos position;
 };
@@ -42,7 +47,7 @@ public:
         instructions_.push_back(std::move(instruction));
     }
 
-    void emit_const(Value value, Pos position = Pos()) {
+    void emit_const(Integer value, Pos position = Pos()) {
         emit(Instruction{.opcode = EOpcode::Const, .value = value, .position = position});
     }
 
@@ -75,15 +80,31 @@ public:
     }
 
     void emit_jump_if_zero(const std::string& label, Pos position = Pos()) {
-        emit(Instruction{.opcode = EOpcode::CJmpZero, .name = label, .position = position});
+        emit(Instruction{.opcode = EOpcode::Jz, .name = label, .position = position});
     }
 
     void emit_jump_if_not_zero(const std::string& label, Pos position = Pos()) {
-        emit(Instruction{.opcode = EOpcode::CJmpNotZero, .name = label, .position = position});
+        emit(Instruction{.opcode = EOpcode::Jnz, .name = label, .position = position});
     }
 
-    void emit_end() {
-        emit(Instruction{.opcode = EOpcode::End});
+    void emit_array(Integer count, Pos position = Pos()) {
+        emit(Instruction{.opcode = EOpcode::Array, .value = count, .position = position});
+    }
+
+    void emit_string(const std::string& text, Pos position = Pos()) {
+        emit(Instruction{.opcode = EOpcode::String, .text = text, .position = position});
+    }
+
+    void emit_length(Pos position = Pos()) {
+        emit(Instruction{.opcode = EOpcode::Length, .position = position});
+    }
+
+    void emit_elem(Pos position = Pos()) {
+        emit(Instruction{.opcode = EOpcode::Elem, .position = position});
+    }
+
+    void emit_set(Pos position = Pos()) {
+        emit(Instruction{.opcode = EOpcode::Set, .position = position});
     }
 
     std::string new_label() {

@@ -12,12 +12,18 @@
 
 using namespace NTomatoInterpretato;
 
-NAst::AST BuildAst(const std::string& source, bool script, std::istream& input, std::ostream& output) {
-    if (script) {
-        std::istringstream stream(source);
+struct Source {
+    bool script = false;
+    std::string text;
+    nlohmann::json json;
+};
+
+NAst::AST BuildAst(const Source& source, std::istream& input, std::ostream& output) {
+    if (source.script) {
+        std::istringstream stream(source.text);
         return NAst::ScriptAstBuilder(input, output).build(stream);
     }
-    return NAst::JsonAstBuilder(input, output).build(nlohmann::json::parse(source));
+    return NAst::JsonAstBuilder(input, output).build(source.json);
 }
 
 struct RunResult {
@@ -25,12 +31,12 @@ struct RunResult {
     std::string error;
 };
 
-RunResult Run(const std::string& source, bool script, const std::string& input, bool machine) {
+RunResult Run(const Source& source, const std::string& input, bool machine) {
     std::istringstream in(input);
     std::ostringstream out;
     RunResult result;
     try {
-        auto ast = BuildAst(source, script, in, out);
+        auto ast = BuildAst(source, in, out);
         if (machine) {
             auto program = NSm::Compiler().compile(ast);
             NSm::StackMachine(in, out).run(program);
@@ -101,18 +107,17 @@ int main(int argc, char** argv) {
             return 0;
         }
 
-        std::string text;
+        Source program;
+        program.script = script;
         if (script) {
-            text.assign(std::istreambuf_iterator<char>(*source), {});
+            program.text.assign(std::istreambuf_iterator<char>(*source), {});
         } else {
-            nlohmann::json json;
-            *source >> json;
-            text = json.dump();
+            *source >> program.json;
         }
         if (mode == "-k") {
             std::string input{std::istreambuf_iterator<char>(std::cin), {}};
-            auto tree = Run(text, script, input, false);
-            auto machine = Run(text, script, input, true);
+            auto tree = Run(program, input, false);
+            auto machine = Run(program, input, true);
             std::cout << tree.output;
             if (!tree.error.empty()) std::cerr << "AST error: " << tree.error << '\n';
             if (!machine.error.empty()) std::cerr << "SM error: " << machine.error << '\n';
@@ -121,7 +126,7 @@ int main(int argc, char** argv) {
             return same && tree.error.empty() ? 0 : 1;
         }
 
-        auto ast = BuildAst(text, script, std::cin, std::cout);
+        auto ast = BuildAst(program, std::cin, std::cout);
         if (mode == "-i") {
             Interpreter().interpret(ast);
         } else {

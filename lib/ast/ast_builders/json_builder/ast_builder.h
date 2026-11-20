@@ -13,9 +13,9 @@ public:
 private:
     std::istream& input_;
     std::ostream& output_;
-    void build_body(const nlohmann::json& json, AST& body) const;
-    StmtNode build_stmt(const nlohmann::json& json) const;
-    ExprNode build_expr(const nlohmann::json& json) const;
+    void build_body(const nlohmann::json& json, AST& body, int depth) const;
+    StmtNode build_stmt(const nlohmann::json& json, int depth) const;
+    ExprNode build_expr(const nlohmann::json& json, int depth) const;
 };
 
 }

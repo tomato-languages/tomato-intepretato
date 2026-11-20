@@ -37,6 +37,22 @@ Token Lexer::next() {
             }
             continue;
         }
+        if (ch == '"') {
+            std::string value;
+            while (true) {
+                int current = take();
+                if (current == std::char_traits<char>::eof()) throw ast_error("Unterminated string", start);
+                if (current == '"') return {Token::Kind::String, value, start};
+                value += static_cast<char>(current);
+            }
+        }
+        if (ch == '\'') {
+            int value = take();
+            if (value == std::char_traits<char>::eof() || take() != '\'') {
+                throw ast_error("Invalid character literal", start);
+            }
+            return {Token::Kind::Number, std::to_string(value), start};
+        }
         std::string text(1, static_cast<char>(ch));
         if (ch >= 'a' && ch <= 'z') {
             while (input_.peek() != std::char_traits<char>::eof()) {
@@ -56,7 +72,7 @@ Token Lexer::next() {
             text += static_cast<char>(take());
             return {Token::Kind::Symbol, text, start};
         }
-        if (text.find_first_not_of("{}();=+-*/%<>") == std::string::npos) {
+        if (text.find_first_not_of("{}();=+-*/%<>[],.") == std::string::npos) {
             return {Token::Kind::Symbol, text, start};
         }
         throw ast_error("Unexpected character: " + text, start);

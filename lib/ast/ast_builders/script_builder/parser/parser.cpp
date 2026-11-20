@@ -23,16 +23,34 @@ bool keyword(const std::string& text) {
     return words.contains(text);
 }
 
+class DepthGuard {
+public:
+    DepthGuard(int& depth, Pos position) : depth_(depth) {
+        if (depth_ >= kMaxNestingDepth) throw ast_error("Program is nested too deeply", position);
+        ++depth_;
+    }
+    ~DepthGuard() { --depth_; }
+    DepthGuard(const DepthGuard&) = delete;
+    DepthGuard& operator=(const DepthGuard&) = delete;
+
+private:
+    int& depth_;
+};
+
 }
 
-bool Parser::accept(const std::string& text) {
-    if (token_.kind == Token::Kind::End || token_.text != text) return false;
+bool Parser::at(std::string_view text) const {
+    return token_.kind != Token::Kind::End && token_.kind != Token::Kind::String && token_.text == text;
+}
+
+bool Parser::accept(std::string_view text) {
+    if (!at(text)) return false;
     token_ = lexer_.next();
     return true;
 }
 
-void Parser::expect(const std::string& text) {
-    if (!accept(text)) throw ast_error("Expected '" + text + "', got '" + token_.text + "'", token_.position);
+void Parser::expect(std::string_view text) {
+    if (!accept(text)) throw ast_error("Expected '" + std::string(text) + "', got '" + token_.text + "'", token_.position);
 }
 
 std::string Parser::identifier() {
@@ -45,20 +63,22 @@ std::string Parser::identifier() {
 }
 
 AST Parser::parse() {
-    if (token_.text != "{") throw ast_error("Program must start with '{'", token_.position);
+    if (!at("{")) throw ast_error("Program must start with '{'", token_.position);
     AST ast = body();
     if (token_.kind != Token::Kind::End) throw ast_error("Unexpected token after program", token_.position);
     return ast;
 }
 
 AST Parser::body() {
+    DepthGuard guard(depth_, token_.position);
     AST ast;
     if (accept("{")) {
-        while (!accept("}")) {
+        if (at("}")) throw ast_error("Block must contain a statement", token_.position);
+        do {
             if (token_.kind == Token::Kind::End) throw ast_error("Expected '}'", token_.position);
             auto part = body();
             for (auto& stmt : part) ast.push_back(std::move(stmt));
-        }
+        } while (!accept("}"));
     } else {
         ast.push_back(statement());
     }
@@ -66,6 +86,7 @@ AST Parser::body() {
 }
 
 StmtNode Parser::branch() {
+    DepthGuard guard(depth_, token_.position);
     expect("(");
     auto condition = expression();
     expect(")");
@@ -121,26 +142,35 @@ StmtNode Parser::statement() {
         return std::make_unique<WriteStmt>(std::move(value), output_);
     }
     Pos position = token_.position;
-    auto name = identifier();
+    const bool starts_with_name = token_.kind == Token::Kind::Identifier;
+    auto target = postfix();
+    auto* element = dynamic_cast<ElemExpr*>(target.get());
+    auto* variable = starts_with_name ? dynamic_cast<VariableExpr*>(target.get()) : nullptr;
+    if (element == nullptr && variable == nullptr) throw ast_error("Expected assignment target", position);
     std::string op;
     if (!accept("=")) {
         op = token_.text;
-        if (!ValueOps::IsOperator(op)) throw ast_error("Expected assignment", token_.position);
+        if (token_.kind != Token::Kind::Symbol || !ValueOps::IsOperator(op)) {
+            throw ast_error("Expected assignment", token_.position);
+        }
         token_ = lexer_.next();
         expect("=");
     }
     auto value = expression();
-    if (!op.empty()) {
-        value = std::make_unique<BinaryOpExpr>(op,
-            std::make_unique<VariableExpr>(name, position), std::move(value), position);
-    }
     accept(";");
+    if (element != nullptr) {
+        return std::make_unique<SetElemStmt>(std::move(element->container), std::move(element->index),
+            std::move(value), op);
+    }
+    std::string name = variable->var_name;
+    if (!op.empty()) value = std::make_unique<BinaryOpExpr>(op, std::move(target), std::move(value), position);
     return std::make_unique<AssignStmt>(name, std::move(value));
 }
 
 ExprNode Parser::expression(int minimum) {
-    auto left = primary();
-    while (precedence(token_.text) >= minimum) {
+    DepthGuard guard(depth_, token_.position);
+    auto left = postfix();
+    while (token_.kind == Token::Kind::Symbol && precedence(token_.text) >= minimum) {
         auto op = token_;
         token_ = lexer_.next();
         auto right = expression(precedence(op.text) + 1);
@@ -149,14 +179,49 @@ ExprNode Parser::expression(int minimum) {
     return left;
 }
 
+ExprNode Parser::postfix() {
+    auto value = primary();
+    while (true) {
+        Pos position = token_.position;
+        if (accept("[")) {
+            auto index = expression();
+            expect("]");
+            value = std::make_unique<ElemExpr>(std::move(value), std::move(index), position);
+        } else if (accept(".")) {
+            if (token_.kind != Token::Kind::Identifier || token_.text != "length") {
+                throw ast_error("Expected 'length'", token_.position);
+            }
+            token_ = lexer_.next();
+            value = std::make_unique<LengthExpr>(std::move(value), position);
+        } else {
+            return value;
+        }
+    }
+}
+
 ExprNode Parser::primary() {
     if (accept("(")) {
         auto value = expression();
         expect(")");
         return value;
     }
+    if (token_.kind == Token::Kind::String) {
+        auto node = std::make_unique<StringExpr>(token_.text, token_.position);
+        token_ = lexer_.next();
+        return node;
+    }
+    Pos start = token_.position;
+    if (accept("[")) {
+        if (at("]")) throw ast_error("Array must contain an element", token_.position);
+        std::vector<ExprNode> elements;
+        do {
+            elements.push_back(expression());
+        } while (accept(","));
+        expect("]");
+        return std::make_unique<ArrayExpr>(std::move(elements), start);
+    }
     if (token_.kind == Token::Kind::Number) {
-        Value value;
+        Integer value;
         auto result = std::from_chars(token_.text.data(), token_.text.data() + token_.text.size(), value);
         if (result.ec != std::errc()) throw ast_error("Integer constant is out of range", token_.position);
         auto node = std::make_unique<NumberExpr>(value, token_.position);

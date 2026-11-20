@@ -1,4 +1,5 @@
 #include "sm/machine/machine.h"
+#include <memory>
 
 namespace NTomatoInterpretato {
 namespace NSm {
@@ -39,8 +40,8 @@ bool StackMachine::run(const Program& program) {
     const auto labels = collect_labels(program);
     const auto& instructions = program.instructions();
     for (const auto& instruction : instructions) {
-        if ((instruction.opcode == EOpcode::Jmp || instruction.opcode == EOpcode::CJmpZero ||
-             instruction.opcode == EOpcode::CJmpNotZero) && !labels.contains(instruction.name)) {
+        if ((instruction.opcode == EOpcode::Jmp || instruction.opcode == EOpcode::Jz ||
+             instruction.opcode == EOpcode::Jnz) && !labels.contains(instruction.name)) {
             throw interpret_error("Unknown label '" + instruction.name + "'", instruction.position);
         }
     }
@@ -78,21 +79,58 @@ bool StackMachine::run(const Program& program) {
 
             case EOpcode::Read: {
                 Value input;
-                if (!(input_ >> input)) {
-                    throw interpret_error("READ: expected an integer on input", instruction.position);
+                try {
+                    input = ValueOps::ReadValue(input_);
+                } catch (const interpret_error& error) {
+                    throw interpret_error(std::string("READ: ") + error.what(), instruction.position);
                 }
-                stack_.push_back(input);
+                stack_.push_back(std::move(input));
                 break;
             }
 
             case EOpcode::Write:
-                output_ << pop(instruction) << '\n';
+                ValueOps::Write(output_, pop(instruction));
                 break;
 
             case EOpcode::Binop: {
                 Value rhs = pop(instruction);
                 Value lhs = pop(instruction);
                 stack_.push_back(ValueOps::Apply(instruction.op, lhs, rhs));
+                break;
+            }
+
+            case EOpcode::Array: {
+                const auto count = static_cast<std::size_t>(instruction.value);
+                if (stack_.size() < count) {
+                    throw interpret_error(to_string(instruction) + ": stack is empty", instruction.position);
+                }
+                auto array = std::make_shared<ArrayData>();
+                array->elements.resize(count);
+                for (std::size_t i = count; i > 0; --i) array->elements[i - 1] = pop(instruction);
+                stack_.push_back(std::move(array));
+                break;
+            }
+
+            case EOpcode::String:
+                stack_.push_back(std::make_shared<std::string>(instruction.text));
+                break;
+
+            case EOpcode::Length:
+                stack_.push_back(ValueOps::Length(pop(instruction)));
+                break;
+
+            case EOpcode::Elem: {
+                Value index = pop(instruction);
+                Value container = pop(instruction);
+                stack_.push_back(ValueOps::Elem(container, index));
+                break;
+            }
+
+            case EOpcode::Set: {
+                Value value = pop(instruction);
+                Value index = pop(instruction);
+                Value container = pop(instruction);
+                ValueOps::SetElem(container, index, value);
                 break;
             }
 
@@ -103,15 +141,15 @@ bool StackMachine::run(const Program& program) {
                 ip = jump_to(instruction);
                 continue;
 
-            case EOpcode::CJmpZero:
-                if (pop(instruction) == 0) {
+            case EOpcode::Jz:
+                if (!ValueOps::IsTrue(pop(instruction))) {
                     ip = jump_to(instruction);
                     continue;
                 }
                 break;
 
-            case EOpcode::CJmpNotZero:
-                if (pop(instruction) != 0) {
+            case EOpcode::Jnz:
+                if (ValueOps::IsTrue(pop(instruction))) {
                     ip = jump_to(instruction);
                     continue;
                 }
@@ -119,10 +157,6 @@ bool StackMachine::run(const Program& program) {
 
             default:
                 throw interpret_error("Unknown stack machine opcode", instruction.position);
-
-            case EOpcode::End:
-                output_.flush();
-                return true;
         }
 
         ++ip;
