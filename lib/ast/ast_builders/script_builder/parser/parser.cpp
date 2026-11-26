@@ -220,6 +220,16 @@ ExprNode Parser::primary() {
         expect("]");
         return std::make_unique<ArrayExpr>(std::move(elements), start);
     }
+    if (accept("{")) {
+        std::vector<ExprNode> elements;
+        if (!at("}")) {
+            do {
+                elements.push_back(expression());
+            } while (accept(","));
+        }
+        expect("}");
+        return std::make_unique<SexpExpr>("list", std::move(elements), start);
+    }
     if (token_.kind == Token::Kind::Number) {
         Integer value;
         auto result = std::from_chars(token_.text.data(), token_.text.data() + token_.text.size(), value);
@@ -227,6 +237,29 @@ ExprNode Parser::primary() {
         auto node = std::make_unique<NumberExpr>(value, token_.position);
         token_ = lexer_.next();
         return node;
+    }
+    if (token_.kind == Token::Kind::Identifier) {
+        Pos position = token_.position;
+        std::string name = token_.text;
+        if (keyword(name)) throw ast_error("Expected variable name", position);
+        token_ = lexer_.next();
+        if (accept("(")) {
+            std::vector<ExprNode> elements;
+            if (!at(")")) {
+                do {
+                    elements.push_back(expression());
+                } while (accept(","));
+            }
+            expect(")");
+            if (name == "nil" && !elements.empty()) {
+                throw ast_error("nil constructor does not take arguments", position);
+            }
+            return std::make_unique<SexpExpr>(name, std::move(elements), position);
+        }
+        if (name == "nil" || (name.front() >= 'A' && name.front() <= 'Z')) {
+            return std::make_unique<SexpExpr>(name, std::vector<ExprNode>(), position);
+        }
+        return std::make_unique<VariableExpr>(name, position);
     }
     Pos position = token_.position;
     return std::make_unique<VariableExpr>(identifier(), position);

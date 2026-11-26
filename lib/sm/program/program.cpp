@@ -58,6 +58,7 @@ std::string to_string(const Instruction& instruction) {
         case EOpcode::Jz:          return "JZ " + instruction.name;
         case EOpcode::Jnz:         return "JNZ " + instruction.name;
         case EOpcode::Array:       return "ARRAY " + std::to_string(instruction.value);
+        case EOpcode::Sexp:        return "SEXP " + quote(instruction.text) + ", " + std::to_string(instruction.value);
         case EOpcode::String:      return "STRING " + quote(instruction.text);
         case EOpcode::Length:      return "LENGTH";
         case EOpcode::Elem:        return "ELEM";
@@ -107,6 +108,12 @@ Program Program::read(std::istream& input) {
         } else if (opcode == "ARRAY") {
             instruction.opcode = EOpcode::Array;
             valid = source >> instruction.value && instruction.value >= 0;
+        } else if (opcode == "SEXP") {
+            instruction.opcode = EOpcode::Sexp;
+            valid = read_quoted(source, instruction.text);
+            char comma = 0;
+            valid = valid && static_cast<bool>(source >> comma) && comma == ',';
+            valid = valid && static_cast<bool>(source >> instruction.value) && instruction.value >= 0;
         } else if (opcode == "STRING") {
             instruction.opcode = EOpcode::String;
             valid = read_quoted(source, instruction.text);
