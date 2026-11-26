@@ -111,6 +111,19 @@ bool StackMachine::run(const Program& program) {
                 break;
             }
 
+            case EOpcode::Sexp: {
+                const auto count = static_cast<std::size_t>(instruction.value);
+                if (stack_.size() < count) {
+                    throw interpret_error(to_string(instruction) + ": stack is empty", instruction.position);
+                }
+                auto sexp = std::make_shared<SexpData>();
+                sexp->tag = instruction.text;
+                sexp->elements.resize(count);
+                for (std::size_t i = count; i > 0; --i) sexp->elements[i - 1] = pop(instruction);
+                stack_.push_back(std::move(sexp));
+                break;
+            }
+
             case EOpcode::String:
                 stack_.push_back(std::make_shared<std::string>(instruction.text));
                 break;

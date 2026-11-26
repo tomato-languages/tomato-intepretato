@@ -122,6 +122,24 @@ ExprNode JsonAstBuilder::build_expr(const Json& json, int depth) const {
         for (const auto& item : items) elements.push_back(build_expr(item, depth + 1));
         return std::make_unique<ArrayExpr>(std::move(elements));
     }
+    if (json.contains("sexp")) {
+        const auto& sexp = json.at("sexp");
+        const std::string tag = sexp.at("tag").get<std::string>();
+        const auto& items = sexp.at("args");
+        if (!items.is_array()) throw ast_error("Expected S-expression arguments: " + describe(items));
+        std::vector<ExprNode> elements;
+        elements.reserve(items.size());
+        for (const auto& item : items) elements.push_back(build_expr(item, depth + 1));
+        return std::make_unique<SexpExpr>(tag, std::move(elements));
+    }
+    if (json.contains("list")) {
+        const auto& items = json.at("list");
+        if (!items.is_array()) throw ast_error("Expected S-expression list: " + describe(items));
+        std::vector<ExprNode> elements;
+        elements.reserve(items.size());
+        for (const auto& item : items) elements.push_back(build_expr(item, depth + 1));
+        return std::make_unique<SexpExpr>("list", std::move(elements));
+    }
     if (json.contains("elem")) {
         return std::make_unique<ElemExpr>(build_expr(json.at("elem"), depth + 1),
             build_expr(json.at("index"), depth + 1));

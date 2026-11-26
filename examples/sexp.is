@@ -1,0 +1,13 @@
+{
+    pair = Pair(1, 2);
+    write(pair);
+    write(pair[0]);
+
+    values = {1, 2, 3, 4};
+    write(values);
+    write(values[2]);
+
+    list = cons(1, cons(2, cons(3, nil)));
+    write(list);
+    write(list[1]);
+}

@@ -54,7 +54,7 @@ Token Lexer::next() {
             return {Token::Kind::Number, std::to_string(value), start};
         }
         std::string text(1, static_cast<char>(ch));
-        if (ch >= 'a' && ch <= 'z') {
+        if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
             while (input_.peek() != std::char_traits<char>::eof()) {
                 int next = input_.peek();
                 if (!std::isalnum(static_cast<unsigned char>(next)) && next != '_' && next != '\'') break;

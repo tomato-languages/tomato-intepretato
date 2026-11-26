@@ -173,6 +173,32 @@ public:
 
 };
 
+class SexpExpr : public BaseExpr {
+    std::string tag_;
+    std::vector<ExprNode> elements_;
+
+public:
+    SexpExpr(const std::string& tag, std::vector<ExprNode>&& elements, Pos position = Pos())
+        : BaseExpr(position), tag_(tag), elements_(std::move(elements)) {
+        int children_height = 0;
+        for (const auto& element : elements_) children_height = std::max(children_height, element->height);
+        set_children_height(children_height);
+    }
+
+    Value evaluate(Environment& env) const override {
+        auto sexp = std::make_shared<SexpData>();
+        sexp->tag = tag_;
+        sexp->elements.reserve(elements_.size());
+        for (const auto& element : elements_) sexp->elements.push_back(element->evaluate(env));
+        return sexp;
+    }
+
+    void compile(NSm::Program& program) const override {
+        for (const auto& element : elements_) element->compile(program);
+        program.emit_sexp(tag_, static_cast<Integer>(elements_.size()), position);
+    }
+};
+
 class ElemExpr : public BaseExpr {
 public:
     ExprNode container;

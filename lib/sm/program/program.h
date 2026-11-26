@@ -21,6 +21,7 @@ enum class EOpcode {
     Jz,
     Jnz,
     Array,
+    Sexp,
     String,
     Length,
     Elem,
@@ -89,6 +90,10 @@ public:
 
     void emit_array(Integer count, Pos position = Pos()) {
         emit(Instruction{.opcode = EOpcode::Array, .value = count, .position = position});
+    }
+
+    void emit_sexp(const std::string& tag, Integer count, Pos position = Pos()) {
+        emit(Instruction{.opcode = EOpcode::Sexp, .value = count, .text = tag, .position = position});
     }
 
     void emit_string(const std::string& text, Pos position = Pos()) {
